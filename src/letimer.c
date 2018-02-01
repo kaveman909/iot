@@ -18,7 +18,7 @@
 /** Period of the LED0 toggle, in seconds */
 #define LED0_PERIOD (3.0f)
 /** On time of the LED0 toggle, in seconds */
-#define LED0_ON_TIME (1.0f)
+#define LED0_ON_TIME (0.075f)
 
 static const LETIMER_Init_TypeDef g_letimer_init = {
 	.enable = false, // keep off at initialization time
