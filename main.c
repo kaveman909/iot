@@ -79,6 +79,8 @@ uint8_t boot_to_dfu = 0;
 #include "main.h"
 #include "gpio.h"
 #include "cmu.h"
+#include "letimer.h"
+#include "user_sleep.h"
 
 //***********************************************************************************
 // defined files
@@ -109,8 +111,6 @@ uint8_t boot_to_dfu = 0;
  */
 int main(void)
 {
-  int i;
-
   // Initialize device
   initMcu();
   // Initialize board
@@ -125,17 +125,12 @@ int main(void)
   // Initialize stack
   gecko_init(&config);
 
+  // Initialize LETIMER
+  letimer_clock_init();
+  letimer_init();
 
   while (1) {
-		for (i = 0; i < 500000; i++);
-		GPIO_PinOutClear(LED0_port, LED0_pin);
-
-		for (i = 0; i < 500000; i++);
-		GPIO_PinOutClear(LED1_port, LED1_pin);
-
-		for (i = 0; i < 1000000; i++);
-		GPIO_PinOutSet(LED0_port, LED0_pin);
-		//GPIO_PinOutSet(LED1_port, LED1_pin);
+	sleep();
   }
 }
 

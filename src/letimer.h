@@ -11,5 +11,6 @@
 #include "em_letimer.h"
 
 void letimer_clock_init(void);
+void letimer_init(void);
 
 #endif /* LETIMER_H_ */

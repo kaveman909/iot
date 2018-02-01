@@ -5,11 +5,11 @@
  *      Author: David
  */
 #include <stdbool.h>
-#include "sleep.h"
+#include <user_sleep.h>
 #include "em_core.h"
 #include "em_emu.h"
 
-#define NUM_OF_SLEEP_MODES 4
+#define NUM_OF_SLEEP_MODES 5
 static uint32_t sleep_block_counter[NUM_OF_SLEEP_MODES];
 
 void sleep(void) {
@@ -39,3 +39,4 @@ void unblockSleepMode(sleepstate_enum minimumMode) {
 	}
 	CORE_ATOMIC_IRQ_ENABLE();
 }
+
