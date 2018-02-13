@@ -130,14 +130,20 @@ int main(void)
 	// Initialize LETIMER
 	letimer_clock_init();
 	letimer_init();
-
 	i2c_setup();
+
 	while(1) {
-		if(event_flag == START_TEMPERATURE_QUERY) {
+		if(event_flag & START_TEMPERATURE_POR) {
+			i2c_sensor_por();
+			event_flag &= ~START_TEMPERATURE_POR;
+		} else if (event_flag & START_TEMPERATURE_QUERY) {
+			i2c_open();
 			i2c_measure_temp_blocking();
-			event_flag = NO_EVENT;
+			i2c_close();
+			event_flag &= ~START_TEMPERATURE_QUERY;
+		} else if (event_flag == NO_EVENT) {
+			sleep();
 		}
-		sleep();
 	}
 }
 /** @} (end addtogroup app) */

@@ -9,8 +9,9 @@
 #define EVENT_H_
 
 typedef enum {
-	NO_EVENT,
-	START_TEMPERATURE_QUERY
+	NO_EVENT = 0x00,
+	START_TEMPERATURE_POR = 0x01,
+	START_TEMPERATURE_QUERY = 0x02,
 }event_flag_t;
 
 extern event_flag_t event_flag;

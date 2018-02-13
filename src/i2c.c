@@ -14,15 +14,27 @@
 
 #define I2C0_SCL_Port gpioPortC
 #define I2C0_SDA_Port gpioPortC
+#define SENSOR_ENABLE_Port gpioPortD
+
 #define I2C0_SCL_Pin 10
 #define I2C0_SDA_Pin 11
+#define SENSOR_ENABLE_Pin 9
+
 #define I2C_SLAVE_ADDR 0x40 // address of Si7021
 #define CMD_MEAS_TEMP_NO_HOLD 0xF3
 #define WRITE_BIT 0
 #define READ_BIT 1
 
 static I2C_Init_TypeDef i2c_init = I2C_INIT_DEFAULT;
-static uint16_t temp_degC;
+static volatile float temperature_degC;
+
+static inline float raw_data_to_temp_degC(uint16_t raw_data) {
+	float temp_degC = 175.72f * (float)raw_data;
+	temp_degC /= 65536;
+	temp_degC -= 46.85f;
+
+	return temp_degC;
+}
 
 /** Setup the I2C GPIO pins.
  * Implementation adapted from Silicon Lab's AN0011SW Application Note.
@@ -32,6 +44,10 @@ void i2c_setup(void) {
 	CMU_ClockEnable(cmuClock_HFPER, true);
 	CMU_ClockEnable(cmuClock_I2C0, true);
 
+}
+
+
+void i2c_open(void) {
 	/* Setup SCL and SDA to be open-drain outputs, initialized to high */
 	GPIO_PinModeSet(I2C0_SCL_Port, I2C0_SCL_Pin, gpioModeWiredAnd, true);
 	GPIO_PinModeSet(I2C0_SDA_Port, I2C0_SDA_Pin, gpioModeWiredAnd, true);
@@ -63,6 +79,23 @@ void i2c_setup(void) {
 	// NVIC_EnableIRQ(I2C0_IRQn);
 }
 
+/** run after temperature data has been collected to save power */
+void i2c_close(void) {
+	/* Reset (hi-z) SCL and SDA pins */
+	GPIO_PinModeSet(I2C0_SCL_Port, I2C0_SCL_Pin, gpioModeDisabled, false);
+	GPIO_PinModeSet(I2C0_SDA_Port, I2C0_SDA_Pin, gpioModeDisabled, false);
+
+	// Turn off the sensor.  disabling the GPIO is OK because there is hw pull-down
+	// on the enable pins.
+	GPIO_PinModeSet(SENSOR_ENABLE_Port, SENSOR_ENABLE_Pin, gpioModeDisabled, false);
+
+	unblockSleepMode(EM_I2C0 + 1);
+}
+
+void i2c_sensor_por(void) {
+	GPIO_PinModeSet(SENSOR_ENABLE_Port, SENSOR_ENABLE_Pin, gpioModePushPull, true);
+}
+
 void i2c_measure_temp_blocking(void) {
 	uint16_t data_lsb;
 	uint16_t data_msb;
@@ -78,13 +111,13 @@ void i2c_measure_temp_blocking(void) {
 	// wait for ack
 	while(!(I2C0->IF & I2C_IF_ACK));
 	I2C0->IFC = I2C_IFC_ACK;
-	// load slave address (reading)
-	I2C0->TXDATA = (I2C_SLAVE_ADDR << 1) | READ_BIT;
-	// send repeat start command
-	I2C0->CMD = I2C_CMD_START;
-	// slave will NACK until conversion complete
 	while(1) {
-		while(!(I2C0->IF & I2C_IF_ACK) || !(I2C0->IF & I2C_IF_NACK));
+		// send repeat start command
+		I2C0->CMD = I2C_CMD_START;
+		// load slave address (reading)
+		I2C0->TXDATA = (I2C_SLAVE_ADDR << 1) | READ_BIT;
+		// slave will NACK until conversion complete
+		while(!(I2C0->IF & I2C_IF_ACK) && !(I2C0->IF & I2C_IF_NACK));
 		if (I2C0->IF & I2C_IF_ACK) {
 			I2C0->IFC = I2C_IFC_ACK;
 			// measurement is ready, wait for msb data
@@ -97,9 +130,10 @@ void i2c_measure_temp_blocking(void) {
 			data_lsb = I2C0->RXDATA;
 			// send nack, then stop to release the bus
 			I2C0->CMD = I2C_CMD_NACK;
-			while(I2C0->STATUS & I2C_STATUS_PNACK);
+			while((I2C0->STATUS & I2C_STATUS_PNACK) == I2C_STATUS_PNACK);
 			I2C0->CMD = I2C_CMD_STOP;
-			temp_degC = (data_msb << 8) + data_lsb;
+			while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
+			temperature_degC = raw_data_to_temp_degC((data_msb << 8) + data_lsb);
 			break; // exit loop since we are done
 		} else {
 			I2C0->IFC = I2C_IFC_NACK;

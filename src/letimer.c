@@ -100,7 +100,7 @@ void letimer_clock_init(void) {
 void letimer_init(void) {
 	// Setup compare registers
 	LETIMER_CompareSet(LETIMER0, 0, get_letimer_period(LETIMER_PERIOD));
-	LETIMER_CompareSet(LETIMER0, 1, get_letimer_on_time(POR_TIME));
+	LETIMER_CompareSet(LETIMER0, 1, get_letimer_on_time(LETIMER_PERIOD - POR_TIME));
 	// Initialize the LETIMER
 	LETIMER_Init(LETIMER0, &g_letimer_init);
 	// wait for synchronization
@@ -122,11 +122,13 @@ void LETIMER0_IRQHandler(void) {
 	uint32_t flags = LETIMER_IntGet(LETIMER0);
 	LETIMER_IntClear(LETIMER0, flags);
 	if (flags & LETIMER_IFC_COMP0) {
-		GPIO_PinOutClear(LED0_port, LED0_pin);
-		//event_flag = START_TEMPERATURE_QUERY;
+		// Start POR sequence
+		//GPIO_PinOutClear(LED0_port, LED0_pin);
+		event_flag |= START_TEMPERATURE_POR;
 	}
 	else if (flags & LETIMER_IFC_COMP1) {
-		GPIO_PinOutSet(LED0_port, LED0_pin);
+		//GPIO_PinOutSet(LED0_port, LED0_pin);
+		event_flag |= START_TEMPERATURE_QUERY;
 	}
 }
 
