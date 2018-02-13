@@ -69,8 +69,6 @@ void i2c_open(void) {
 	if (I2C0->STATE & I2C_STATE_BUSY) {
 		I2C0->CMD = I2C_CMD_ABORT;
 	}
-	/* I2C needs at least EM1 in Master Mode, so block EM2 */
-	blockSleepMode(EM_I2C0 + 1);
 	/* Clear interrupts */
 	I2C_IntClear(I2C0, I2C_IFC_ACK | I2C_IFC_NACK);
 	/* Setup interrupts */
@@ -88,17 +86,13 @@ void i2c_close(void) {
 	// Turn off the sensor.  disabling the GPIO is OK because there is hw pull-down
 	// on the enable pins.
 	GPIO_PinModeSet(SENSOR_ENABLE_Port, SENSOR_ENABLE_Pin, gpioModeDisabled, false);
-
-	unblockSleepMode(EM_I2C0 + 1);
 }
 
 void i2c_sensor_por(void) {
 	GPIO_PinModeSet(SENSOR_ENABLE_Port, SENSOR_ENABLE_Pin, gpioModePushPull, true);
 }
 
-void i2c_measure_temp_blocking(void) {
-	uint16_t data_lsb;
-	uint16_t data_msb;
+void i2c_start_measurement(void) {
 	// load slave address (writing)
 	I2C0->TXDATA = (I2C_SLAVE_ADDR << 1) | WRITE_BIT;
 	// start command
@@ -111,6 +105,15 @@ void i2c_measure_temp_blocking(void) {
 	// wait for ack
 	while(!(I2C0->IF & I2C_IF_ACK));
 	I2C0->IFC = I2C_IFC_ACK;
+	// send stop command, done for now while measurement commences
+	I2C0->CMD = I2C_CMD_STOP;
+	while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
+}
+
+void i2c_finish_measurement(void) {
+	uint16_t data_lsb;
+	uint16_t data_msb;
+
 	while(1) {
 		// send repeat start command
 		I2C0->CMD = I2C_CMD_START;

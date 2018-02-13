@@ -20,6 +20,8 @@
 #define LETIMER_PERIOD (2.0f)
 /** POR time of Si7021 */
 #define POR_TIME (0.080f)
+/** Approx. Measurement time of Si7021 */
+#define MEASUREMENT_TIME (0.010f)
 
 extern event_flag_t event_flag;
 
@@ -32,6 +34,8 @@ static const LETIMER_Init_TypeDef g_letimer_init = {
 	.ufoa0 = letimerUFOANone,
 	.ufoa1 = letimerUFOANone
 };
+
+static bool letimer_updated = false;
 
 /* source:  https://stackoverflow.com/questions/101439/
  * the-most-efficient-way-to-implement-an-integer-based-power-function-powint-int
@@ -97,6 +101,16 @@ void letimer_clock_init(void) {
 	CMU_ClockEnable(cmuClock_LETIMER0, true);
 }
 
+void letimer_update_compare1(void) {
+	LETIMER_CompareSet(LETIMER0, 1, get_letimer_on_time(LETIMER_PERIOD - POR_TIME - MEASUREMENT_TIME));
+	letimer_updated = true;
+}
+
+void letimer_reset_compare1(void) {
+	LETIMER_CompareSet(LETIMER0, 1, get_letimer_on_time(LETIMER_PERIOD - POR_TIME));
+	letimer_updated = false;
+}
+
 void letimer_init(void) {
 	// Setup compare registers
 	LETIMER_CompareSet(LETIMER0, 0, get_letimer_period(LETIMER_PERIOD));
@@ -128,7 +142,11 @@ void LETIMER0_IRQHandler(void) {
 	}
 	else if (flags & LETIMER_IFC_COMP1) {
 		//GPIO_PinOutSet(LED0_port, LED0_pin);
-		event_flag |= START_TEMPERATURE_QUERY;
+		if (!letimer_updated) {
+			event_flag |= START_TEMPERATURE_QUERY;
+		} else {
+			event_flag |= FINISH_TEMPERATURE_QUERY;
+		}
 	}
 }
 

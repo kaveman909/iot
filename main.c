@@ -138,9 +138,14 @@ int main(void)
 			event_flag &= ~START_TEMPERATURE_POR;
 		} else if (event_flag & START_TEMPERATURE_QUERY) {
 			i2c_open();
-			i2c_measure_temp_blocking();
-			i2c_close();
+			i2c_start_measurement();
+			letimer_update_compare1();
 			event_flag &= ~START_TEMPERATURE_QUERY;
+		} else if (event_flag & FINISH_TEMPERATURE_QUERY){
+			i2c_finish_measurement();
+			i2c_close();
+			letimer_reset_compare1();
+			event_flag &= ~FINISH_TEMPERATURE_QUERY;
 		} else if (event_flag == NO_EVENT) {
 			sleep();
 		}
