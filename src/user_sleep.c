@@ -12,6 +12,8 @@
 #define NUM_OF_SLEEP_MODES 5
 static uint32_t sleep_block_counter[NUM_OF_SLEEP_MODES];
 
+/** Credit given to SiLabs for the 'sleep' routine,
+ * as this code is based off of their reference design */
 void sleep(void) {
 	if (sleep_block_counter[EM0]) {
 		return;

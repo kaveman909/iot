@@ -26,6 +26,8 @@
 #define READ_BIT 1
 
 static I2C_Init_TypeDef i2c_init = I2C_INIT_DEFAULT;
+/* Temperature data */
+#define TEMPERATURE_LIMIT_DEG_C 15.0f
 static volatile float temperature_degC;
 
 static inline float raw_data_to_temp_degC(uint16_t raw_data) {
@@ -119,7 +121,7 @@ void i2c_finish_measurement(void) {
 		I2C0->CMD = I2C_CMD_START;
 		// load slave address (reading)
 		I2C0->TXDATA = (I2C_SLAVE_ADDR << 1) | READ_BIT;
-		// slave will NACK until conversion complete
+		// slave will NACK until conversion complete, in which case it will ACK
 		while(!(I2C0->IF & I2C_IF_ACK) && !(I2C0->IF & I2C_IF_NACK));
 		if (I2C0->IF & I2C_IF_ACK) {
 			I2C0->IFC = I2C_IFC_ACK;
@@ -137,6 +139,12 @@ void i2c_finish_measurement(void) {
 			I2C0->CMD = I2C_CMD_STOP;
 			while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
 			temperature_degC = raw_data_to_temp_degC((data_msb << 8) + data_lsb);
+			if (temperature_degC < TEMPERATURE_LIMIT_DEG_C){
+				GPIO_PinOutSet(LED1_port, LED1_pin);
+			} else {
+				GPIO_PinOutClear(LED1_port, LED1_pin);
+			}
+
 			break; // exit loop since we are done
 		} else {
 			I2C0->IFC = I2C_IFC_NACK;
