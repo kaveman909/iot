@@ -81,6 +81,8 @@ uint8_t boot_to_dfu = 0;
 #include "cmu.h"
 #include "letimer.h"
 #include "user_sleep.h"
+#include "event.h"
+#include "i2c.h"
 
 //***********************************************************************************
 // defined files
@@ -90,7 +92,7 @@ uint8_t boot_to_dfu = 0;
 //***********************************************************************************
 // global variables
 //***********************************************************************************
-
+extern event_flag_t event_flag;
 
 //***********************************************************************************
 // function prototypes
@@ -111,28 +113,32 @@ uint8_t boot_to_dfu = 0;
  */
 int main(void)
 {
-  // Initialize device
-  initMcu();
-  // Initialize board
-  initBoard();
+	// Initialize device
+	initMcu();
+	// Initialize board
+	initBoard();
 
-  /* Initialize GPIO */
-  gpio_init();
+	/* Initialize GPIO */
+	gpio_init();
 
-  // Initialize clocks
-  cmu_init();
+	// Initialize clocks
+	cmu_init();
 
-  // Initialize stack
-  gecko_init(&config);
+	// Initialize stack
+	gecko_init(&config);
 
-  // Initialize LETIMER
-  letimer_clock_init();
-  letimer_init();
+	// Initialize LETIMER
+	letimer_clock_init();
+	letimer_init();
 
-  while (1) {
-	sleep();
-  }
+	i2c_setup();
+	while(1) {
+		if(event_flag == START_TEMPERATURE_QUERY) {
+			i2c_measure_temp_blocking();
+			event_flag = NO_EVENT;
+		}
+		sleep();
+	}
 }
-
 /** @} (end addtogroup app) */
 /** @} (end addtogroup Application) */

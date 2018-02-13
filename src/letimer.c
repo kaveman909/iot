@@ -10,15 +10,18 @@
 #include "letimer.h"
 #include "cmu.h"
 #include "gpio.h"
+#include "event.h"
 
 /** lowest mode the LETIMER is allowed to operate in.
  *  Valid range: EM0 - EM3
  */
 #define EM_LETIMER EM3
-/** Period of the LED0 toggle, in seconds */
-#define LED0_PERIOD (3.0f)
-/** On time of the LED0 toggle, in seconds */
-#define LED0_ON_TIME (0.075f)
+/** Period of temperature measurements */
+#define LETIMER_PERIOD (2.0f)
+/** POR time of Si7021 */
+#define POR_TIME (0.080f)
+
+extern event_flag_t event_flag;
 
 static const LETIMER_Init_TypeDef g_letimer_init = {
 	.enable = false, // keep off at initialization time
@@ -96,8 +99,8 @@ void letimer_clock_init(void) {
 
 void letimer_init(void) {
 	// Setup compare registers
-	LETIMER_CompareSet(LETIMER0, 0, get_letimer_period(LED0_PERIOD));
-	LETIMER_CompareSet(LETIMER0, 1, get_letimer_on_time(LED0_ON_TIME));
+	LETIMER_CompareSet(LETIMER0, 0, get_letimer_period(LETIMER_PERIOD));
+	LETIMER_CompareSet(LETIMER0, 1, get_letimer_on_time(POR_TIME));
 	// Initialize the LETIMER
 	LETIMER_Init(LETIMER0, &g_letimer_init);
 	// wait for synchronization
@@ -106,7 +109,7 @@ void letimer_init(void) {
 	LETIMER_IntClear(LETIMER0, (LETIMER_IFC_COMP0 | LETIMER_IFC_COMP1 |
 			LETIMER_IFC_UF | LETIMER_IFC_REP0 | LETIMER_IFC_REP1));
 	// enable select interrupts
-	LETIMER_IntEnable(LETIMER0, (LETIMER_IEN_COMP0 | LETIMER_IEN_COMP1));
+	LETIMER_IntEnable(LETIMER0, (LETIMER_IEN_COMP0 | LETIMER_IEN_COMP1 ));
 	// Block the next sleep mode (ex. timer configured for EM0, block EM1).
 	blockSleepMode(EM_LETIMER + 1);
 	// Enable the LETIMER0 Interrupt
@@ -120,7 +123,9 @@ void LETIMER0_IRQHandler(void) {
 	LETIMER_IntClear(LETIMER0, flags);
 	if (flags & LETIMER_IFC_COMP0) {
 		GPIO_PinOutClear(LED0_port, LED0_pin);
-	} else if (flags & LETIMER_IFC_COMP1) {
+		//event_flag = START_TEMPERATURE_QUERY;
+	}
+	else if (flags & LETIMER_IFC_COMP1) {
 		GPIO_PinOutSet(LED0_port, LED0_pin);
 	}
 }
