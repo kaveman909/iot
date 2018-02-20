@@ -101,6 +101,7 @@ void i2c_start_measurement(void) {
 	// start command
 	I2C0->CMD = I2C_CMD_START;
 	// wait for ack
+	//while(!(I2C0->IF & I2C_IF_ACK));
 	event_flag |= LOAD_MEASURE_CMD;
 	blockSleepMode(EM_I2C0 + 1);
 }
@@ -115,6 +116,7 @@ void i2c_load_measure_cmd(void) {
 void i2c_load_stop_cmd(void) {
 	// send stop command, done for now while measurement commences
 	I2C0->CMD = I2C_CMD_STOP;
+	I2C_IntDisable(I2C0, I2C_IEN_ACK);
 	//while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
 }
 

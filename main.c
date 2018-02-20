@@ -145,16 +145,14 @@ int main(void)
 			i2c_close();
 			letimer_reset_compare1();
 			event_flag &= ~FINISH_TEMPERATURE_QUERY;
-		} else if (event_flag & (LOAD_MEASURE_CMD | ACK_RECEIVED)){
+		} else if ((event_flag & (LOAD_MEASURE_CMD | ACK_RECEIVED)) == (LOAD_MEASURE_CMD | ACK_RECEIVED)){
 			i2c_load_measure_cmd();
 			event_flag &= ~(LOAD_MEASURE_CMD | ACK_RECEIVED);
-		} else if (event_flag & (LOAD_STOP_CMD | ACK_RECEIVED)) {
+		} else if ((event_flag & (LOAD_STOP_CMD | ACK_RECEIVED)) == (LOAD_STOP_CMD | ACK_RECEIVED)) {
 			i2c_load_stop_cmd();
 			letimer_update_compare1();
 			event_flag &= ~(LOAD_MEASURE_CMD | ACK_RECEIVED);
-		}
-
-		else {
+		} else if (event_flag == NO_EVENT) {
 			sleep();
 		}
 	}
