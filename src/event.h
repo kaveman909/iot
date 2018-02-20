@@ -15,7 +15,11 @@ typedef enum {
 	FINISH_TEMPERATURE_QUERY = 0x04,
 	ACK_RECEIVED = 0x08,
 	LOAD_MEASURE_CMD = 0x10,
-	LOAD_STOP_CMD = 0x20
+	LOAD_STOP_CMD = 0x20,
+	WAIT_FOR_MEASUREMENT = 0x40,
+	NACK_RECEIVED = 0x80,
+	DATA_RECEIVED = 0x100,
+	WAIT_FOR_LSB = 0x200
 }event_flag_t;
 
 extern event_flag_t event_flag;

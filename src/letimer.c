@@ -21,7 +21,7 @@
 /** POR time of Si7021 */
 #define POR_TIME (0.080f)
 /** Approx. Measurement time of Si7021 */
-#define MEASUREMENT_TIME (0.010f)
+#define MEASUREMENT_TIME (0.005f)
 
 extern event_flag_t event_flag;
 

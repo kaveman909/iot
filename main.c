@@ -134,24 +134,35 @@ int main(void)
 
 	while(1) {
 		if(event_flag & START_TEMPERATURE_POR) {
-			i2c_sensor_por();
 			event_flag &= ~START_TEMPERATURE_POR;
+			i2c_sensor_por();
 		} else if (event_flag & START_TEMPERATURE_QUERY) {
+			event_flag &= ~START_TEMPERATURE_QUERY;
 			i2c_open();
 			i2c_start_measurement();
-			event_flag &= ~START_TEMPERATURE_QUERY;
-		} else if (event_flag & FINISH_TEMPERATURE_QUERY){
+		} else if (event_flag & FINISH_TEMPERATURE_QUERY) {
+			event_flag &= ~FINISH_TEMPERATURE_QUERY;
 			i2c_finish_measurement();
+		} else if ((event_flag & (WAIT_FOR_MEASUREMENT | NACK_RECEIVED)) == (WAIT_FOR_MEASUREMENT | NACK_RECEIVED)) {
+			event_flag &= ~(WAIT_FOR_MEASUREMENT | NACK_RECEIVED);
+			i2c_finish_measurement();
+		} else if ((event_flag & (WAIT_FOR_MEASUREMENT | DATA_RECEIVED)) == (WAIT_FOR_MEASUREMENT | DATA_RECEIVED)) {
+			event_flag &= ~(WAIT_FOR_MEASUREMENT | DATA_RECEIVED);
+			i2c_handle_first_byte();
+		} else if ((event_flag & (WAIT_FOR_LSB | DATA_RECEIVED)) == (WAIT_FOR_LSB | DATA_RECEIVED)) {
+			event_flag &= ~(WAIT_FOR_LSB | DATA_RECEIVED);
+			i2c_handle_second_byte();
 			i2c_close();
 			letimer_reset_compare1();
-			event_flag &= ~FINISH_TEMPERATURE_QUERY;
-		} else if ((event_flag & (LOAD_MEASURE_CMD | ACK_RECEIVED)) == (LOAD_MEASURE_CMD | ACK_RECEIVED)){
-			i2c_load_measure_cmd();
+			// clear interrupt-generated flags
+			event_flag &= ~(NACK_RECEIVED | ACK_RECEIVED | DATA_RECEIVED);
+		} else if ((event_flag & (LOAD_MEASURE_CMD | ACK_RECEIVED)) == (LOAD_MEASURE_CMD | ACK_RECEIVED)) {
 			event_flag &= ~(LOAD_MEASURE_CMD | ACK_RECEIVED);
+			i2c_load_measure_cmd();
 		} else if ((event_flag & (LOAD_STOP_CMD | ACK_RECEIVED)) == (LOAD_STOP_CMD | ACK_RECEIVED)) {
+			event_flag &= ~(LOAD_STOP_CMD | ACK_RECEIVED);
 			i2c_load_stop_cmd();
 			letimer_update_compare1();
-			event_flag &= ~(LOAD_MEASURE_CMD | ACK_RECEIVED);
 		} else if (event_flag == NO_EVENT) {
 			sleep();
 		}
