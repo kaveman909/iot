@@ -11,6 +11,7 @@
 #include "cmu.h"
 #include "gpio.h"
 #include "user_sleep.h"
+#include "event.h"
 
 #define I2C0_SCL_Port gpioPortC
 #define I2C0_SDA_Port gpioPortC
@@ -74,9 +75,9 @@ void i2c_open(void) {
 	/* Clear interrupts */
 	I2C_IntClear(I2C0, I2C_IFC_ACK | I2C_IFC_NACK);
 	/* Setup interrupts */
-	// I2C_IntEnable(I2C0);
+	I2C_IntEnable(I2C0, I2C_IEN_ACK);
 	/* Enable interrupt in CPU */
-	// NVIC_EnableIRQ(I2C0_IRQn);
+	NVIC_EnableIRQ(I2C0_IRQn);
 }
 
 /** run after temperature data has been collected to save power */
@@ -100,16 +101,21 @@ void i2c_start_measurement(void) {
 	// start command
 	I2C0->CMD = I2C_CMD_START;
 	// wait for ack
-	while(!(I2C0->IF & I2C_IF_ACK));
-	I2C0->IFC = I2C_IFC_ACK;
+	event_flag |= LOAD_MEASURE_CMD;
+	blockSleepMode(EM_I2C0 + 1);
+}
+
+void i2c_load_measure_cmd(void) {
 	// load measure command
 	I2C0->TXDATA = CMD_MEAS_TEMP_NO_HOLD;
 	// wait for ack
-	while(!(I2C0->IF & I2C_IF_ACK));
-	I2C0->IFC = I2C_IFC_ACK;
+	event_flag |= LOAD_STOP_CMD;
+}
+
+void i2c_load_stop_cmd(void) {
 	// send stop command, done for now while measurement commences
 	I2C0->CMD = I2C_CMD_STOP;
-	while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
+	//while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
 }
 
 void i2c_finish_measurement(void) {
@@ -154,5 +160,9 @@ void i2c_finish_measurement(void) {
 }
 
 void I2C0_IRQHandler(void) {
-
+	uint32_t flags = I2C_IntGet(I2C0);
+	I2C_IntClear(I2C0, flags);
+	if (flags & I2C_IF_ACK) {
+		event_flag |= ACK_RECEIVED;
+	}
 }
