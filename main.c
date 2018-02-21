@@ -53,22 +53,18 @@
 uint8_t bluetooth_stack_heap[DEFAULT_BLUETOOTH_HEAP(MAX_CONNECTIONS)];
 
 // Gecko configuration parameters (see gecko_configuration.h)
-static const gecko_configuration_t config = {
-  .config_flags = 0,
-  .sleep.flags = SLEEP_FLAGS_DEEP_SLEEP_ENABLE,
-  .bluetooth.max_connections = MAX_CONNECTIONS,
-  .bluetooth.heap = bluetooth_stack_heap,
-  .bluetooth.heap_size = sizeof(bluetooth_stack_heap),
-  .bluetooth.sleep_clock_accuracy = 100, // ppm
-  .gattdb = &bg_gattdb_data,
-  .ota.flags = 0,
-  .ota.device_name_len = 3,
-  .ota.device_name_ptr = "OTA",
+static const gecko_configuration_t config = { .config_flags = 0, .sleep.flags =
+		SLEEP_FLAGS_DEEP_SLEEP_ENABLE, .bluetooth.max_connections =
+		MAX_CONNECTIONS, .bluetooth.heap = bluetooth_stack_heap,
+		.bluetooth.heap_size = sizeof(bluetooth_stack_heap),
+		.bluetooth.sleep_clock_accuracy = 100, // ppm
+		.gattdb = &bg_gattdb_data, .ota.flags = 0, .ota.device_name_len = 3,
+		.ota.device_name_ptr = "OTA",
 #if (HAL_PA_ENABLE) && defined(FEATURE_PA_HIGH_POWER)
-  .pa.config_enable = 1, // Enable high power PA
-  .pa.input = GECKO_RADIO_PA_INPUT_VBAT, // Configure PA input to VBAT
+		.pa.config_enable = 1, // Enable high power PA
+		.pa.input = GECKO_RADIO_PA_INPUT_VBAT,// Configure PA input to VBAT
 #endif // (HAL_PA_ENABLE) && defined(FEATURE_PA_HIGH_POWER)
-};
+	};
 
 // Flag for indicating DFU Reset must be performed
 uint8_t boot_to_dfu = 0;
@@ -88,21 +84,17 @@ uint8_t boot_to_dfu = 0;
 // defined files
 //***********************************************************************************
 
-
 //***********************************************************************************
 // global variables
 //***********************************************************************************
-extern event_flag_t event_flag;
 
 //***********************************************************************************
 // function prototypes
 //***********************************************************************************
 
-
 //***********************************************************************************
 // functions
 //***********************************************************************************
-
 
 //***********************************************************************************
 // main
@@ -111,8 +103,7 @@ extern event_flag_t event_flag;
 /**
  * @brief  Main function
  */
-int main(void)
-{
+int main(void) {
 	// Initialize device
 	initMcu();
 	// Initialize board
@@ -131,40 +122,112 @@ int main(void)
 	letimer_clock_init();
 	letimer_init();
 	i2c_setup();
+	while (1) {
+		/* Event pointer for handling events */
+		struct gecko_cmd_packet* evt;
 
-	while(1) {
-		if(event_flag & START_TEMPERATURE_POR) {
-			event_flag &= ~START_TEMPERATURE_POR;
-			i2c_sensor_por();
-		} else if (event_flag & START_TEMPERATURE_QUERY) {
-			event_flag &= ~START_TEMPERATURE_QUERY;
-			i2c_open();
-			i2c_start_measurement();
-		} else if (event_flag & FINISH_TEMPERATURE_QUERY) {
-			event_flag &= ~FINISH_TEMPERATURE_QUERY;
-			i2c_finish_measurement();
-		} else if ((event_flag & (WAIT_FOR_MEASUREMENT | NACK_RECEIVED)) == (WAIT_FOR_MEASUREMENT | NACK_RECEIVED)) {
-			event_flag &= ~(WAIT_FOR_MEASUREMENT | NACK_RECEIVED);
-			i2c_finish_measurement();
-		} else if ((event_flag & (WAIT_FOR_MEASUREMENT | DATA_RECEIVED)) == (WAIT_FOR_MEASUREMENT | DATA_RECEIVED)) {
-			event_flag &= ~(WAIT_FOR_MEASUREMENT | DATA_RECEIVED);
-			i2c_handle_first_byte();
-		} else if ((event_flag & (WAIT_FOR_LSB | DATA_RECEIVED)) == (WAIT_FOR_LSB | DATA_RECEIVED)) {
-			event_flag &= ~(WAIT_FOR_LSB | DATA_RECEIVED);
-			i2c_handle_second_byte();
-			i2c_close();
-			letimer_reset_compare1();
-			// clear interrupt-generated flags
-			event_flag &= ~(NACK_RECEIVED | ACK_RECEIVED | DATA_RECEIVED);
-		} else if ((event_flag & (LOAD_MEASURE_CMD | ACK_RECEIVED)) == (LOAD_MEASURE_CMD | ACK_RECEIVED)) {
-			event_flag &= ~(LOAD_MEASURE_CMD | ACK_RECEIVED);
-			i2c_load_measure_cmd();
-		} else if ((event_flag & (LOAD_STOP_CMD | ACK_RECEIVED)) == (LOAD_STOP_CMD | ACK_RECEIVED)) {
-			event_flag &= ~(LOAD_STOP_CMD | ACK_RECEIVED);
-			i2c_load_stop_cmd();
-			letimer_update_compare1();
-		} else if (event_flag == NO_EVENT) {
-			sleep();
+		/* Check for stack event. */
+		evt = gecko_wait_event();
+
+		/* Handle events */
+		switch (BGLIB_MSG_ID(evt->header)) {
+		/* This boot event is generated when the system boots up after reset.
+		 * Do not call any stack commands before receiving the boot event.
+		 * Here the system is set to start advertising immediately after boot procedure. */
+		case gecko_evt_system_boot_id:
+
+			/* Set advertising parameters. 100ms advertisement interval. All channels used.
+			 * The first two parameters are minimum and maximum advertising interval, both in
+			 * units of (milliseconds * 1.6). The third parameter '7' sets advertising on all channels. */
+			gecko_cmd_le_gap_set_adv_parameters(160, 160, 7);
+
+			/* Start general advertising and enable connections. */
+			gecko_cmd_le_gap_set_mode(le_gap_general_discoverable,
+					le_gap_undirected_connectable);
+			break;
+
+		case gecko_evt_le_connection_closed_id:
+
+			/* Check if need to boot to dfu mode */
+			if (boot_to_dfu) {
+				/* Enter to DFU OTA mode */
+				gecko_cmd_system_reset(2);
+			} else {
+				/* Restart advertising after client has disconnected */
+				gecko_cmd_le_gap_set_mode(le_gap_general_discoverable,
+						le_gap_undirected_connectable);
+			}
+			break;
+
+			/* Events related to OTA upgrading
+			 ----------------------------------------------------------------------------- */
+
+			/* Check if the user-type OTA Control Characteristic was written.
+			 * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
+		case gecko_evt_gatt_server_user_write_request_id:
+
+			if (evt->data.evt_gatt_server_user_write_request.characteristic
+					== gattdb_ota_control) {
+				/* Set flag to enter to OTA mode */
+				boot_to_dfu = 1;
+				/* Send response to Write Request */
+				gecko_cmd_gatt_server_send_user_write_response(
+						evt->data.evt_gatt_server_user_write_request.connection,
+						gattdb_ota_control, bg_err_success);
+
+				/* Close connection to enter to DFU OTA mode */
+				gecko_cmd_endpoint_close(
+						evt->data.evt_gatt_server_user_write_request.connection);
+			}
+			break;
+
+		case gecko_evt_system_external_signal_id:
+			if (event_flag & START_TEMPERATURE_POR) {
+				event_flag &= ~START_TEMPERATURE_POR;
+				i2c_sensor_por();
+			}
+			if (event_flag & START_TEMPERATURE_QUERY) {
+				event_flag &= ~START_TEMPERATURE_QUERY;
+				i2c_open();
+				i2c_start_measurement();
+			}
+			if (event_flag & FINISH_TEMPERATURE_QUERY) {
+				event_flag &= ~FINISH_TEMPERATURE_QUERY;
+				i2c_finish_measurement();
+			}
+			if ((event_flag & (WAIT_FOR_MEASUREMENT | NACK_RECEIVED))
+					== (WAIT_FOR_MEASUREMENT | NACK_RECEIVED)) {
+				event_flag &= ~(WAIT_FOR_MEASUREMENT | NACK_RECEIVED);
+				i2c_finish_measurement();
+			}
+			if ((event_flag & (WAIT_FOR_MEASUREMENT | DATA_RECEIVED))
+					== (WAIT_FOR_MEASUREMENT | DATA_RECEIVED)) {
+				event_flag &= ~(WAIT_FOR_MEASUREMENT | DATA_RECEIVED);
+				i2c_handle_first_byte();
+			}
+			if ((event_flag & (WAIT_FOR_LSB | DATA_RECEIVED))
+					== (WAIT_FOR_LSB | DATA_RECEIVED)) {
+				event_flag &= ~(WAIT_FOR_LSB | DATA_RECEIVED);
+				i2c_handle_second_byte();
+				i2c_close();
+				letimer_reset_compare1();
+				// clear interrupt-generated flags
+				event_flag &= ~(NACK_RECEIVED | ACK_RECEIVED | DATA_RECEIVED);
+			}
+			if ((event_flag & (LOAD_MEASURE_CMD | ACK_RECEIVED))
+					== (LOAD_MEASURE_CMD | ACK_RECEIVED)) {
+				event_flag &= ~(LOAD_MEASURE_CMD | ACK_RECEIVED);
+				i2c_load_measure_cmd();
+			}
+			if ((event_flag & (LOAD_STOP_CMD | ACK_RECEIVED))
+					== (LOAD_STOP_CMD | ACK_RECEIVED)) {
+				event_flag &= ~(LOAD_STOP_CMD | ACK_RECEIVED);
+				i2c_load_stop_cmd();
+				letimer_update_compare1();
+			}
+			break;
+		default:
+			break;
 		}
 	}
 }

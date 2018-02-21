@@ -12,6 +12,8 @@
 #include "gpio.h"
 #include "user_sleep.h"
 #include "event.h"
+#include "native_gecko.h"
+#include "sleep.h"
 
 #define I2C0_SCL_Port gpioPortC
 #define I2C0_SDA_Port gpioPortC
@@ -81,7 +83,8 @@ void i2c_open(void) {
 	I2C_IntEnable(I2C0, I2C_IEN_ACK | I2C_IEN_NACK | I2C_IEN_RXDATAV);
 	/* Enable interrupt in CPU */
 	NVIC_EnableIRQ(I2C0_IRQn);
-	blockSleepMode(EM_I2C0 + 1);
+	//blockSleepMode(EM_I2C0 + 1);
+	SLEEP_SleepBlockBegin(EM_I2C0 + 1);
 }
 
 /** run after temperature data has been collected to save power */
@@ -94,7 +97,7 @@ void i2c_close(void) {
 	// Turn off the sensor.  disabling the GPIO is OK because there is hw pull-down
 	// on the enable pins.
 	GPIO_PinModeSet(SENSOR_ENABLE_Port, SENSOR_ENABLE_Pin, gpioModeDisabled, false);
-	unblockSleepMode(EM_I2C0 + 1);
+	SLEEP_SleepBlockEnd(EM_I2C0 + 1);
 }
 
 void i2c_sensor_por(void) {
@@ -107,8 +110,8 @@ void i2c_start_measurement(void) {
 	// start command
 	I2C0->CMD = I2C_CMD_START;
 	// wait for ack
-	//while(!(I2C0->IF & I2C_IF_ACK));
 	event_flag |= LOAD_MEASURE_CMD;
+	gecko_external_signal(event_flag);
 }
 
 void i2c_load_measure_cmd(void) {
@@ -116,11 +119,10 @@ void i2c_load_measure_cmd(void) {
 	I2C0->TXDATA = CMD_MEAS_TEMP_NO_HOLD;
 	// wait for ack
 	event_flag |= LOAD_STOP_CMD;
+	gecko_external_signal(event_flag);
 }
 
-static volatile uint32_t counter = 0;
 void i2c_load_stop_cmd(void) {
-	counter++;
 	// send stop command, done for now while measurement commences
 	I2C0->CMD = I2C_CMD_STOP;
 	//while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
@@ -132,6 +134,7 @@ void i2c_handle_first_byte() {
 	I2C0->CMD = I2C_CMD_ACK;
 	// wait for lsb data
 	event_flag |= WAIT_FOR_LSB;
+	gecko_external_signal(event_flag);
 }
 
 void i2c_handle_second_byte() {
@@ -155,6 +158,7 @@ void i2c_finish_measurement(void) {
 	// load slave address (reading)
 	I2C0->TXDATA = (I2C_SLAVE_ADDR << 1) | READ_BIT;
 	event_flag |= WAIT_FOR_MEASUREMENT;
+	gecko_external_signal(event_flag);
 }
 
 void I2C0_IRQHandler(void) {
@@ -170,4 +174,5 @@ void I2C0_IRQHandler(void) {
 		event_flag |= DATA_RECEIVED;
 		i2c_rxdata = I2C0->RXDATA;
 	}
+	gecko_external_signal(event_flag);
 }

@@ -7,7 +7,7 @@
 
 #ifndef EVENT_H_
 #define EVENT_H_
-
+#include <stdint.h>
 typedef enum {
 	NO_EVENT = 0x00,
 	START_TEMPERATURE_POR = 0x01,
@@ -22,6 +22,6 @@ typedef enum {
 	WAIT_FOR_LSB = 0x200
 }event_flag_t;
 
-extern event_flag_t event_flag;
+extern uint32_t event_flag;
 
 #endif /* EVENT_H_ */

@@ -6,5 +6,6 @@
  */
 
 #include "event.h"
+#include <stdint.h>
 
-event_flag_t event_flag = NO_EVENT;
+uint32_t event_flag = NO_EVENT;

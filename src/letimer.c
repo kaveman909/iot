@@ -11,19 +11,19 @@
 #include "cmu.h"
 #include "gpio.h"
 #include "event.h"
+#include "sleep.h"
+#include "native_gecko.h"
 
 /** lowest mode the LETIMER is allowed to operate in.
  *  Valid range: EM0 - EM3
  */
 #define EM_LETIMER EM3
 /** Period of temperature measurements */
-#define LETIMER_PERIOD (2.0f)
+#define LETIMER_PERIOD (4.0f)
 /** POR time of Si7021 */
 #define POR_TIME (0.080f)
 /** Approx. Measurement time of Si7021 */
 #define MEASUREMENT_TIME (0.005f)
-
-extern event_flag_t event_flag;
 
 static const LETIMER_Init_TypeDef g_letimer_init = {
 	.enable = false, // keep off at initialization time
@@ -125,7 +125,7 @@ void letimer_init(void) {
 	// enable select interrupts
 	LETIMER_IntEnable(LETIMER0, (LETIMER_IEN_COMP0 | LETIMER_IEN_COMP1 ));
 	// Block the next sleep mode (ex. timer configured for EM0, block EM1).
-	blockSleepMode(EM_LETIMER + 1);
+	SLEEP_SleepBlockBegin(EM_LETIMER + 1);
 	// Enable the LETIMER0 Interrupt
 	NVIC_EnableIRQ(LETIMER0_IRQn);
 	// Start the timer
@@ -148,6 +148,7 @@ void LETIMER0_IRQHandler(void) {
 			event_flag |= FINISH_TEMPERATURE_QUERY;
 		}
 	}
+	gecko_external_signal(event_flag);
 }
 
 
