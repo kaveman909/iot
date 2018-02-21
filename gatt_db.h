@@ -16,5 +16,10 @@ extern const struct bg_gattdb_def bg_gattdb_data;
 #define gattdb_service_changed_char             3
 #define gattdb_device_name                      7
 #define gattdb_ota_control                     19
+#define gattdb_temperature_measurement         22
+#define gattdb_temperature_type                25
+#define gattdb_intermediate_temperature         27
+#define gattdb_measurement_interval            30
+#define gattdb_valid_range                     32
 
 #endif
