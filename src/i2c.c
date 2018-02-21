@@ -44,6 +44,10 @@ static inline float raw_data_to_temp_degC(uint16_t raw_data) {
 	return temp_degC;
 }
 
+int32_t i2c_get_temperature_deg_mC(void) {
+	return (int32_t)((temperature_degC * 1000) + 0.5f);
+}
+
 /** Setup the I2C GPIO pins.
  * Implementation adapted from Silicon Lab's AN0011SW Application Note.
  */
@@ -145,6 +149,7 @@ void i2c_handle_second_byte() {
 	I2C0->CMD = I2C_CMD_STOP;
 	while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
 	temperature_degC = raw_data_to_temp_degC((data_msb << 8) + data_lsb);
+
 	if (temperature_degC < TEMPERATURE_LIMIT_DEG_C){
 		GPIO_PinOutSet(LED1_port, LED1_pin);
 	} else {

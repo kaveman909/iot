@@ -21,6 +21,6 @@ void i2c_load_measure_cmd(void);
 void i2c_load_stop_cmd(void);
 void i2c_handle_first_byte(void);
 void i2c_handle_second_byte(void);
-
+int32_t i2c_get_temperature_deg_mC(void) ;
 
 #endif /* I2C_H_ */

@@ -18,7 +18,7 @@
 #include "init_board.h"
 #include "ble-configuration.h"
 #include "board_features.h"
-
+#include "infrastructure.h"
 /* Bluetooth stack headers */
 #include "bg_types.h"
 #include "native_gecko.h"
@@ -99,6 +99,29 @@ uint8_t boot_to_dfu = 0;
 //***********************************************************************************
 // main
 //***********************************************************************************
+
+/** Source code for "temperatureMeasure" function modified from SiLabs Example Project "soc-thermometer"
+ * Due credit is given to SiLabs. */
+static void temperatureMeasure(void) {
+	uint8_t htmTempBuffer[5]; /* Stores the temperature data in the Health Thermometer (HTM) format. */
+	uint8_t flags = 0x00; /* HTM flags set as 0 for Celsius, no time stamp and no temperature type. */
+	int32_t tempData; /* Stores the Temperature data read from the RHT sensor. */
+	uint32_t temperature; /* Stores the temperature data read from the sensor in the correct format */
+	uint8_t *p = htmTempBuffer; /* Pointer to HTM temperature buffer needed for converting values to bitstream. */
+
+	/* Convert flags to bitstream and append them in the HTM temperature data buffer (htmTempBuffer) */
+	UINT8_TO_BITSTREAM(p, flags);
+	tempData = i2c_get_temperature_deg_mC();
+	/* Convert sensor data to correct temperature format */
+	temperature = FLT_TO_UINT32(tempData, -3);
+	/* Convert temperature to bitstream and place it in the HTM temperature data buffer (htmTempBuffer) */
+	UINT32_TO_BITSTREAM(p, temperature);
+	/* Send indication of the temperature in htmTempBuffer to all "listening" clients.
+	 * This enables the Health Thermometer in the Blue Gecko app to display the temperature.
+	 *  0xFF as connection ID will send indications to all connections. */
+	gecko_cmd_gatt_server_send_characteristic_notification(0xFF,
+			gattdb_temperature_measurement, 5, htmTempBuffer);
+}
 
 /**
  * @brief  Main function
@@ -211,6 +234,7 @@ int main(void) {
 				i2c_handle_second_byte();
 				i2c_close();
 				letimer_reset_compare1();
+				temperatureMeasure();
 				// clear interrupt-generated flags
 				event_flag &= ~(NACK_RECEIVED | ACK_RECEIVED | DATA_RECEIVED);
 			}
@@ -231,5 +255,6 @@ int main(void) {
 		}
 	}
 }
+
 /** @} (end addtogroup app) */
 /** @} (end addtogroup Application) */
