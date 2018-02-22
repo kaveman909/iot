@@ -87,7 +87,7 @@ uint8_t boot_to_dfu = 0;
 //***********************************************************************************
 // global variables
 //***********************************************************************************
-
+static uint8_t connection;
 //***********************************************************************************
 // function prototypes
 //***********************************************************************************
@@ -119,6 +119,7 @@ static void temperatureMeasure(void) {
 	/* Send indication of the temperature in htmTempBuffer to all "listening" clients.
 	 * This enables the Health Thermometer in the Blue Gecko app to display the temperature.
 	 *  0xFF as connection ID will send indications to all connections. */
+	gecko_cmd_le_connection_get_rssi(connection);
 	gecko_cmd_gatt_server_send_characteristic_notification(0xFF,
 			gattdb_temperature_measurement, 5, htmTempBuffer);
 }
@@ -148,7 +149,9 @@ int main(void) {
 	while (1) {
 		/* Event pointer for handling events */
 		struct gecko_cmd_packet* evt;
-
+		int16_t tx_level;
+		static int8_t rssi_hist = 100;
+		int8_t rssi;
 		/* Check for stack event. */
 		evt = gecko_wait_event();
 
@@ -162,15 +165,25 @@ int main(void) {
 			/* Set advertising parameters. 100ms advertisement interval. All channels used.
 			 * The first two parameters are minimum and maximum advertising interval, both in
 			 * units of (milliseconds * 1.6). The third parameter '7' sets advertising on all channels. */
-			gecko_cmd_le_gap_set_adv_parameters(160, 160, 7);
+			gecko_cmd_le_gap_set_adv_parameters((uint16_t)(ADVERT_MIN_MS * 1.6f), (uint16_t)(ADVERT_MAX_MS * 1.6f), 7);
 
 			/* Start general advertising and enable connections. */
 			gecko_cmd_le_gap_set_mode(le_gap_general_discoverable,
 					le_gap_undirected_connectable);
+
+			/* Reset output power to 0 dBm */
+			gecko_cmd_system_set_tx_power(0);
+			break;
+
+		case gecko_evt_le_connection_opened_id:
+			connection = evt->data.evt_le_connection_opened.connection;
+			gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
+			gecko_cmd_le_connection_get_rssi(connection);
 			break;
 
 		case gecko_evt_le_connection_closed_id:
-
+			/* Reset output power to 0 dBm */
+			gecko_cmd_system_set_tx_power(0);
 			/* Check if need to boot to dfu mode */
 			if (boot_to_dfu) {
 				/* Enter to DFU OTA mode */
@@ -203,7 +216,28 @@ int main(void) {
 						evt->data.evt_gatt_server_user_write_request.connection);
 			}
 			break;
-
+		case gecko_evt_le_connection_rssi_id:
+			rssi = evt->data.evt_le_connection_rssi.rssi;
+			if (rssi > -35) {
+				tx_level = -26; // -26dBm min from datasheet
+			} else if (rssi > -45) {
+				tx_level = -20;
+			} else if (rssi > -55) {
+				tx_level = -15;
+			} else if (rssi > -65) {
+				tx_level = -5;
+			} else if (rssi > -75) {
+				tx_level = 0;
+			} else if (rssi > -85) {
+				tx_level = 5;
+			} else {
+				tx_level = 8; // +8dBm max from datasheet
+			}
+			if (rssi != rssi_hist) {
+				gecko_cmd_system_set_tx_power(tx_level * 10);
+			}
+			rssi_hist = rssi;
+			break;
 		case gecko_evt_system_external_signal_id:
 			if (event_flag & START_TEMPERATURE_POR) {
 				event_flag &= ~START_TEMPERATURE_POR;

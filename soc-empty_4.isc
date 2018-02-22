@@ -79,6 +79,14 @@ appPlugin: stack_bridge=false
       <properties indicate="true" indicate_requirement="mandatory" notify="false" notify_requirement="excluded" read="false" read_requirement="excluded" reliable_write="false" reliable_write_requirement="excluded" write="false" write_no_response="false" write_no_response_requirement="excluded" write_requirement="excluded"/>
     </characteristic>
   </service>
+  <service advertise="true" id="tx_power" name="Tx Power" requirement="optional" sourceId="org.bluetooth.service.tx_power" type="primary" uuid="1804">
+    <informativeText>Abstract:  This service exposes a device's current transmit power level when in a connection.  Summary:  The Tx Power service is instantiated as a Primary Service. There is only one instance of the Tx Power service on a device. There is exactly one instance of the Tx Power Level characteristic  </informativeText>
+    <characteristic id="tx_power_level" name="Tx Power Level" sourceId="org.bluetooth.characteristic.tx_power_level" uuid="2A07">
+      <informativeText>Abstract:  The Transmit Power Level characteristic represents the current transmit power level in dBm, and the level ranges from -100 dBm to +20 dBm to a resolution of 1 dBm.  Summary:  The value of the characteristic is a signed 8 bit integer that has a fixed point exponent of 0.  Examples:  The value 0x12 is interpreted as +18dBm  The value 0xEE is interpreted as -18dBm  </informativeText>
+      <value length="1" type="hex" variable_length="false"/>
+      <properties indicate="true" indicate_requirement="mandatory" notify="false" notify_requirement="excluded" read="true" read_requirement="mandatory" reliable_write="false" reliable_write_requirement="excluded" write="false" write_no_response="false" write_no_response_requirement="excluded" write_requirement="excluded"/>
+    </characteristic>
+  </service>
 </gatt>
 }
 {setupId:callbackConfiguration
