@@ -18,5 +18,11 @@ extern const struct bg_gattdb_def bg_gattdb_data;
 #define gattdb_ota_control                     19
 #define gattdb_temperature_measurement         22
 #define gattdb_tx_power_level                  26
+#define gattdb_led_on_off                      30
+#define gattdb_led_blink_rate                  32
+#define gattdb_led_intensity                   34
+#define gattdb_speaker_on_off                  37
+#define gattdb_speaker_pitch                   39
+#define gattdb_speaker_volume                  41
 
 #endif
