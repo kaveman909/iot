@@ -90,21 +90,21 @@
     <characteristic id="led_on_off" name="On/Off" sourceId="custom.type" uuid="30432380-fd30-4543-b0dc-c891606e7551">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties write="true" write_requirement="mandatory"/>
+      <properties write="true" write_requirement="optional"/>
     </characteristic>
     
     <!--Blink Rate-->
     <characteristic id="led_blink_rate" name="Blink Rate" sourceId="custom.type" uuid="2cba242d-643c-489b-aad9-beea762764aa">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties read="true" read_requirement="mandatory" write="true" write_requirement="mandatory"/>
+      <properties read="true" read_requirement="optional" write="true" write_requirement="optional"/>
     </characteristic>
     
     <!--Intensity-->
     <characteristic id="led_intensity" name="Intensity" sourceId="custom.type" uuid="07f15833-d39b-4eb3-a5f8-863fd642a27f">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties read="true" read_requirement="mandatory" write="true" write_requirement="mandatory"/>
+      <properties read="true" read_requirement="optional" write="true" write_requirement="optional"/>
     </characteristic>
   </service>
   

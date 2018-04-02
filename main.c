@@ -30,6 +30,7 @@
 
 /* Device initialization header */
 #include "hal-config.h"
+#include "ps_keys.h"
 
 #if defined(HAL_CONFIG)
 #include "bsphalconfig.h"
@@ -88,6 +89,7 @@ uint8_t boot_to_dfu = 0;
 // global variables
 //***********************************************************************************
 static uint8_t connection;
+//volatile static uint8_t attribute_data;
 //***********************************************************************************
 // function prototypes
 //***********************************************************************************
@@ -123,6 +125,19 @@ static void temperatureMeasure(void) {
 			gattdb_temperature_measurement, 5, htmTempBuffer);
 }
 
+void ps_keys_init(uint8_t ps_att_len, uint8_t * ps_att_data, uint8_t * ps_att_default_data) {
+	for (int i = 0; i < ps_att_len; i++) {
+		//gecko_cmd_flash_ps_erase(ps_key_led_blink_rate);
+		struct gecko_msg_flash_ps_load_rsp_t * temp = gecko_cmd_flash_ps_load(ps_att_data[i] + ps_key_base);
+		if (temp->result != 0) {
+			// Write the default data, since this the PS Key is not valid yet (first time after flashing)
+			gecko_cmd_gatt_server_write_attribute_value(ps_att_data[i], 0, 1, (ps_att_default_data + i));
+		} else {
+			// The PS Key is valid; load the saved data to the attribute database
+			gecko_cmd_gatt_server_write_attribute_value(ps_att_data[i], 0, temp->value.len, temp->value.data);
+		}
+	}
+}
 /**
  * @brief  Main function
  */
@@ -172,6 +187,15 @@ int main(void) {
 
 			/* Reset output power to 0 dBm */
 			gecko_cmd_system_set_tx_power(0);
+
+			/* Initialize PS data */
+			uint8_t gattdb_ps_data[] = {
+					gattdb_led_blink_rate, gattdb_led_intensity, gattdb_speaker_pitch, gattdb_speaker_volume
+			};
+			uint8_t gattdb_ps_default_data[] = {
+					default_led_blink_rate, default_led_intensity, default_speaker_pitch, default_speaker_volume
+			};
+			ps_keys_init(sizeof(gattdb_ps_data), gattdb_ps_data, gattdb_ps_default_data);
 			break;
 
 		case gecko_evt_le_connection_opened_id:
@@ -221,6 +245,16 @@ int main(void) {
 						evt->data.evt_gatt_server_user_write_request.connection);
 			}
 			break;
+
+		case gecko_evt_gatt_server_attribute_value_id:
+			if (evt->data.evt_gatt_server_attribute_value.attribute == gattdb_led_blink_rate) {
+				GPIO_PinOutToggle(LED0_port, LED0_pin);
+				struct gecko_msg_gatt_server_read_attribute_value_rsp_t * temp =
+						gecko_cmd_gatt_server_read_attribute_value(gattdb_led_blink_rate, 0);
+				gecko_cmd_flash_ps_save(ps_key_led_blink_rate, temp->value.len, temp->value.data);
+			}
+			break;
+
 		case gecko_evt_le_connection_rssi_id:
 			rssi = evt->data.evt_le_connection_rssi.rssi;
 			if (rssi > -35) {
@@ -245,6 +279,7 @@ int main(void) {
 			}
 			tx_level_hist = tx_level;
 			break;
+
 		case gecko_evt_system_external_signal_id:
 			if (event_flag & START_TEMPERATURE_POR) {
 				event_flag &= ~START_TEMPERATURE_POR;
@@ -291,6 +326,7 @@ int main(void) {
 				letimer_update_compare1();
 			}
 			break;
+
 		default:
 			break;
 		}
