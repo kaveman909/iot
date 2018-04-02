@@ -119,7 +119,6 @@ static void temperatureMeasure(void) {
 	/* Send indication of the temperature in htmTempBuffer to all "listening" clients.
 	 * This enables the Health Thermometer in the Blue Gecko app to display the temperature.
 	 *  0xFF as connection ID will send indications to all connections. */
-	gecko_cmd_le_connection_get_rssi(connection);
 	gecko_cmd_gatt_server_send_characteristic_notification(0xFF,
 			gattdb_temperature_measurement, 5, htmTempBuffer);
 }
@@ -150,7 +149,7 @@ int main(void) {
 		/* Event pointer for handling events */
 		struct gecko_cmd_packet* evt;
 		int16_t tx_level;
-		static int8_t rssi_hist = 100;
+		static int16_t tx_level_hist = 0;
 		int8_t rssi;
 		/* Check for stack event. */
 		evt = gecko_wait_event();
@@ -179,6 +178,7 @@ int main(void) {
 			connection = evt->data.evt_le_connection_opened.connection;
 			gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			gecko_cmd_le_connection_get_rssi(connection);
+			gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
 			break;
 
 		case gecko_evt_le_connection_closed_id:
@@ -193,6 +193,7 @@ int main(void) {
 				gecko_cmd_le_gap_set_mode(le_gap_general_discoverable,
 						le_gap_undirected_connectable);
 			}
+			gecko_cmd_hardware_set_soft_timer(0, 0, 0);
 			break;
 
 			/* Events related to OTA upgrading
@@ -200,6 +201,10 @@ int main(void) {
 
 			/* Check if the user-type OTA Control Characteristic was written.
 			 * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
+		case gecko_evt_hardware_soft_timer_id:
+				gecko_cmd_le_connection_get_rssi(connection);
+		        break;
+
 		case gecko_evt_gatt_server_user_write_request_id:
 
 			if (evt->data.evt_gatt_server_user_write_request.characteristic
@@ -233,10 +238,12 @@ int main(void) {
 			} else {
 				tx_level = 8; // +8dBm max from datasheet
 			}
-			if (rssi != rssi_hist) {
+			if (tx_level != tx_level_hist) {
 				gecko_cmd_system_set_tx_power(tx_level * 10);
+				gecko_cmd_gatt_server_send_characteristic_notification(0xFF,
+					gattdb_tx_power_level, 1, (uint8_t *)&tx_level);
 			}
-			rssi_hist = rssi;
+			tx_level_hist = tx_level;
 			break;
 		case gecko_evt_system_external_signal_id:
 			if (event_flag & START_TEMPERATURE_POR) {

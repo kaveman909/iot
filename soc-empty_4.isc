@@ -1,5 +1,5 @@
 #ISD afv6
-# Simplicity Studio version: 4.25.1.201801251900-1144
+# Simplicity Studio version: 4.27.0.201802161248-1185
 
 # Application configuration
 stackId: com.silabs.sdk.stack.super
@@ -84,7 +84,7 @@ appPlugin: stack_bridge=false
     <characteristic id="tx_power_level" name="Tx Power Level" sourceId="org.bluetooth.characteristic.tx_power_level" uuid="2A07">
       <informativeText>Abstract:  The Transmit Power Level characteristic represents the current transmit power level in dBm, and the level ranges from -100 dBm to +20 dBm to a resolution of 1 dBm.  Summary:  The value of the characteristic is a signed 8 bit integer that has a fixed point exponent of 0.  Examples:  The value 0x12 is interpreted as +18dBm  The value 0xEE is interpreted as -18dBm  </informativeText>
       <value length="1" type="hex" variable_length="false"/>
-      <properties indicate="true" indicate_requirement="mandatory" notify="false" notify_requirement="excluded" read="true" read_requirement="mandatory" reliable_write="false" reliable_write_requirement="excluded" write="false" write_no_response="false" write_no_response_requirement="excluded" write_requirement="excluded"/>
+      <properties indicate="true" indicate_requirement="mandatory" notify="false" notify_requirement="excluded" read="false" read_requirement="excluded" reliable_write="false" reliable_write_requirement="excluded" write="false" write_no_response="false" write_no_response_requirement="excluded" write_requirement="excluded"/>
     </characteristic>
   </service>
 </gatt>
