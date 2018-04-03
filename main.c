@@ -30,7 +30,6 @@
 
 /* Device initialization header */
 #include "hal-config.h"
-#include "ps_keys.h"
 
 #if defined(HAL_CONFIG)
 #include "bsphalconfig.h"
@@ -80,16 +79,50 @@ uint8_t boot_to_dfu = 0;
 #include "user_sleep.h"
 #include "event.h"
 #include "i2c.h"
+#include "ps_keys.h"
 
 //***********************************************************************************
 // defined files
 //***********************************************************************************
+#define LED_ON_TIME_MS        50
+#define LED_PERIOD_STEP_MS    100
+#define LED_TIMEOUT_SEC       30
+
+#define LED_ON_TIME_NS        (LED_ON_TIME_MS * 1000000UL)
+#define LED_PERIOD_STEP_NS    (LED_PERIOD_STEP_MS * 1000000UL)
+#define LFO_HZ                32768
+#define LFO_NS                30518
+#define LED_ON_TIME_LFO       (LED_ON_TIME_NS/LFO_NS)
+#define LED_PERIOD_STEP_LFO   (LED_PERIOD_STEP_NS/LFO_NS)
+#define LED_TIMEOUT_LFO       (LED_TIMEOUT_SEC * LFO_HZ)
+
+#define LED_BLINK_RATE_HANDLE 1
+#define LED_TIMEOUT_HANDLE    2
+
+// Private Types
+typedef union {
+	uint8_t data[4];
+	struct {
+		uint8_t led_blink_rate;
+		uint8_t led_intensity;
+		uint8_t speaker_pitch;
+		uint8_t speaker_volume;
+	} s;
+} ps_data_t;
 
 //***********************************************************************************
 // global variables
 //***********************************************************************************
 static uint8_t connection;
 //volatile static uint8_t attribute_data;
+static const uint8_t gattdb_ps_data[] = {
+		gattdb_led_blink_rate, gattdb_led_intensity, gattdb_speaker_pitch, gattdb_speaker_volume
+};
+static const uint8_t gattdb_ps_default_data[] = {
+		default_led_blink_rate, default_led_intensity, default_speaker_pitch, default_speaker_volume
+};
+static ps_data_t ps_data;
+
 //***********************************************************************************
 // function prototypes
 //***********************************************************************************
@@ -125,16 +158,18 @@ static void temperatureMeasure(void) {
 			gattdb_temperature_measurement, 5, htmTempBuffer);
 }
 
-void ps_keys_init(uint8_t ps_att_len, uint8_t * ps_att_data, uint8_t * ps_att_default_data) {
+void ps_keys_init(uint8_t ps_att_len, const uint8_t * ps_att_data, const uint8_t * ps_att_default_data, ps_data_t * ps_data) {
 	for (int i = 0; i < ps_att_len; i++) {
 		//gecko_cmd_flash_ps_erase(ps_key_led_blink_rate);
 		struct gecko_msg_flash_ps_load_rsp_t * temp = gecko_cmd_flash_ps_load(ps_att_data[i] + ps_key_base);
 		if (temp->result != 0) {
 			// Write the default data, since this the PS Key is not valid yet (first time after flashing)
 			gecko_cmd_gatt_server_write_attribute_value(ps_att_data[i], 0, 1, (ps_att_default_data + i));
+			ps_data->data[i] = *(ps_att_default_data + i);
 		} else {
 			// The PS Key is valid; load the saved data to the attribute database
 			gecko_cmd_gatt_server_write_attribute_value(ps_att_data[i], 0, temp->value.len, temp->value.data);
+			ps_data->data[i] = temp->value.data[0];
 		}
 	}
 }
@@ -189,18 +224,12 @@ int main(void) {
 			gecko_cmd_system_set_tx_power(0);
 
 			/* Initialize PS data */
-			uint8_t gattdb_ps_data[] = {
-					gattdb_led_blink_rate, gattdb_led_intensity, gattdb_speaker_pitch, gattdb_speaker_volume
-			};
-			uint8_t gattdb_ps_default_data[] = {
-					default_led_blink_rate, default_led_intensity, default_speaker_pitch, default_speaker_volume
-			};
-			ps_keys_init(sizeof(gattdb_ps_data), gattdb_ps_data, gattdb_ps_default_data);
+			ps_keys_init(sizeof(gattdb_ps_data), gattdb_ps_data, gattdb_ps_default_data, &ps_data);
 			break;
 
 		case gecko_evt_le_connection_opened_id:
 			connection = evt->data.evt_le_connection_opened.connection;
-			gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
+			//gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			gecko_cmd_le_connection_get_rssi(connection);
 			gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
 			break;
@@ -223,12 +252,25 @@ int main(void) {
 			/* Events related to OTA upgrading
 			 ----------------------------------------------------------------------------- */
 
-			/* Check if the user-type OTA Control Characteristic was written.
-			 * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
 		case gecko_evt_hardware_soft_timer_id:
-				gecko_cmd_le_connection_get_rssi(connection);
+				if (evt->data.evt_hardware_soft_timer.handle == 0) {
+					gecko_cmd_le_connection_get_rssi(connection);
+				} else if (evt->data.evt_hardware_soft_timer.handle == LED_BLINK_RATE_HANDLE) {
+					if(GPIO_PinOutGet(LED_BW_port, LED_BW_pin)) {
+						GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
+						gecko_cmd_hardware_set_soft_timer((LED_PERIOD_STEP_LFO * ps_data.s.led_blink_rate) - LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
+					} else {
+						GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
+						gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
+					}
+				} else if (evt->data.evt_hardware_soft_timer.handle == LED_TIMEOUT_HANDLE) {
+					GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
+					gecko_cmd_hardware_set_soft_timer(0, LED_BLINK_RATE_HANDLE, true);
+				}
 		        break;
 
+		/* Check if the user-type OTA Control Characteristic was written.
+		 * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
 		case gecko_evt_gatt_server_user_write_request_id:
 
 			if (evt->data.evt_gatt_server_user_write_request.characteristic
@@ -247,11 +289,27 @@ int main(void) {
 			break;
 
 		case gecko_evt_gatt_server_attribute_value_id:
-			if (evt->data.evt_gatt_server_attribute_value.attribute == gattdb_led_blink_rate) {
-				GPIO_PinOutToggle(LED0_port, LED0_pin);
+			// Attribute value has changed; check if persistent storage needs to be updated
+			for (int i = 0; i < sizeof(gattdb_ps_data); i++) {
+				if (evt->data.evt_gatt_server_attribute_value.attribute == gattdb_ps_data[i]) {
+					//GPIO_PinOutToggle(LED0_port, LED0_pin);
+					struct gecko_msg_gatt_server_read_attribute_value_rsp_t * temp =
+							gecko_cmd_gatt_server_read_attribute_value(gattdb_ps_data[i], 0);
+					gecko_cmd_flash_ps_save(gattdb_ps_data[i] + ps_key_base, temp->value.len, temp->value.data);
+					ps_data.data[i] = temp->value.data[0];
+					break; // no need to continue looping; at most one attribute has changed
+				}
+			}
+			if (evt->data.evt_gatt_server_attribute_value.attribute == gattdb_led_on_off) {
+				// Check if we should turn LED on for a short period
 				struct gecko_msg_gatt_server_read_attribute_value_rsp_t * temp =
-						gecko_cmd_gatt_server_read_attribute_value(gattdb_led_blink_rate, 0);
-				gecko_cmd_flash_ps_save(ps_key_led_blink_rate, temp->value.len, temp->value.data);
+						gecko_cmd_gatt_server_read_attribute_value(gattdb_led_on_off, 0);
+				if (temp->value.data[0] == 1) {
+					// Enable LED pulsing
+					GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
+					gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
+					gecko_cmd_hardware_set_soft_timer(LED_TIMEOUT_LFO, LED_TIMEOUT_HANDLE, true);
+				}
 			}
 			break;
 

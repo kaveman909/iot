@@ -32,4 +32,6 @@ void gpio_init(void){
 	GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthWeakAlternateWeak);
 	GPIO_PinModeSet(LED1_port, LED1_pin, gpioModePushPull, LED1_default);
 
+	GPIO_DriveStrengthSet(LED_BW_port, gpioDriveStrengthStrongAlternateStrong);
+	GPIO_PinModeSet(LED_BW_port, LED_BW_pin, gpioModePushPull, LED_BW_default);
 }

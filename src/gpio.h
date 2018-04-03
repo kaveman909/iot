@@ -18,7 +18,10 @@
 #define LED1_port		gpioPortF
 #define LED1_pin		5
 #define LED1_default	false	// off
-
+// Bright White LED pin is
+#define LED_BW_port     gpioPortD
+#define LED_BW_pin      10
+#define LED_BW_default  false   // off
 //***********************************************************************************
 // global variables
 //***********************************************************************************
