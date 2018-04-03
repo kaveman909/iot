@@ -86,7 +86,7 @@ uint8_t boot_to_dfu = 0;
 //***********************************************************************************
 #define LED_ON_TIME_MS        50
 #define LED_PERIOD_STEP_MS    100
-#define LED_TIMEOUT_SEC       30
+//#define LED_TIMEOUT_SEC       30
 
 #define LED_ON_TIME_NS        (LED_ON_TIME_MS * 1000000UL)
 #define LED_PERIOD_STEP_NS    (LED_PERIOD_STEP_MS * 1000000UL)
@@ -94,7 +94,7 @@ uint8_t boot_to_dfu = 0;
 #define LFO_NS                30518
 #define LED_ON_TIME_LFO       (LED_ON_TIME_NS/LFO_NS)
 #define LED_PERIOD_STEP_LFO   (LED_PERIOD_STEP_NS/LFO_NS)
-#define LED_TIMEOUT_LFO       (LED_TIMEOUT_SEC * LFO_HZ)
+//#define LED_TIMEOUT_LFO       (LED_TIMEOUT_SEC * LFO_HZ)
 
 #define LED_BLINK_RATE_HANDLE 1
 #define LED_TIMEOUT_HANDLE    2
@@ -308,7 +308,7 @@ int main(void) {
 					// Enable LED pulsing
 					GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
 					gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
-					gecko_cmd_hardware_set_soft_timer(LED_TIMEOUT_LFO, LED_TIMEOUT_HANDLE, true);
+					gecko_cmd_hardware_set_soft_timer((ps_data.s.led_intensity * LFO_HZ), LED_TIMEOUT_HANDLE, true);
 				}
 			}
 			break;
