@@ -229,7 +229,7 @@ int main(void) {
 
 		case gecko_evt_le_connection_opened_id:
 			connection = evt->data.evt_le_connection_opened.connection;
-			//gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
+			gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			gecko_cmd_le_connection_get_rssi(connection);
 			gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
 			break;
