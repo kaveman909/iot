@@ -80,6 +80,7 @@ uint8_t boot_to_dfu = 0;
 #include "event.h"
 #include "i2c.h"
 #include "ps_keys.h"
+//#include <stdio.h>
 
 //***********************************************************************************
 // defined files
@@ -122,6 +123,8 @@ static const uint8_t gattdb_ps_default_data[] = {
 		default_led_blink_rate, default_led_intensity, default_speaker_pitch, default_speaker_volume
 };
 static ps_data_t ps_data;
+volatile static uint32_t passkey;
+static uint8_t bonding_handle;
 
 //***********************************************************************************
 // function prototypes
@@ -210,7 +213,21 @@ int main(void) {
 		 * Do not call any stack commands before receiving the boot event.
 		 * Here the system is set to start advertising immediately after boot procedure. */
 		case gecko_evt_system_boot_id:
-
+			gecko_cmd_sm_delete_bondings();
+			//printf("System boot\r\n");
+			/* Set up bonding (flags = 0b0111 = 0x07):
+			 * (0:1) Bonding requires MITM protection
+			 * (1:1) Encryption requires bonding
+			 * (2:1) Secure connections only
+			 * (3:0) Bonding request does not need to be confirmed
+			 *
+			 * Device only has a display (no keyboard)
+			 */
+			gecko_cmd_sm_configure(0x07, sm_io_capability_displayonly);
+			/* Accept new bondings */
+			gecko_cmd_sm_set_bondable_mode(1);
+			/* Set hard-coded passkey for now */
+			gecko_cmd_sm_set_passkey(123456);
 			/* Set advertising parameters. 100ms advertisement interval. All channels used.
 			 * The first two parameters are minimum and maximum advertising interval, both in
 			 * units of (milliseconds * 1.6). The third parameter '7' sets advertising on all channels. */
@@ -224,12 +241,34 @@ int main(void) {
 			gecko_cmd_system_set_tx_power(0);
 
 			/* Initialize PS data */
+
 			ps_keys_init(sizeof(gattdb_ps_data), gattdb_ps_data, gattdb_ps_default_data, &ps_data);
+			break;
+
+		case gecko_evt_sm_passkey_display_id:
+			passkey = evt->data.evt_sm_passkey_display.passkey;
+			break;
+
+		case gecko_evt_sm_bonded_id:
+			break;
+
+		case gecko_evt_sm_bonding_failed_id:
+			gecko_cmd_sm_bonding_confirm(connection, false);
+			gecko_cmd_le_connection_close(connection);
+			/* Ensure that bond is deleted at this point */
+			if (bonding_handle != 0xff) {
+				gecko_cmd_sm_delete_bonding(bonding_handle);
+			}
 			break;
 
 		case gecko_evt_le_connection_opened_id:
 			connection = evt->data.evt_le_connection_opened.connection;
-			gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
+			/* Increasing security triggers the pairing process */
+			gecko_cmd_sm_increase_security(connection);
+			bonding_handle = evt->data.evt_le_connection_opened.bonding;
+			if (bonding_handle != 0xff) {
+				gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
+			}
 			gecko_cmd_le_connection_get_rssi(connection);
 			gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
 			break;

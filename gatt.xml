@@ -90,21 +90,21 @@
     <characteristic id="led_on_off" name="On/Off" sourceId="custom.type" uuid="30432380-fd30-4543-b0dc-c891606e7551">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties write="true" write_requirement="optional"/>
+      <properties authenticated_write="true" authenticated_write_requirement="optional"/>
     </characteristic>
     
     <!--Blink Rate-->
     <characteristic id="led_blink_rate" name="Blink Rate" sourceId="custom.type" uuid="2cba242d-643c-489b-aad9-beea762764aa">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties read="true" read_requirement="optional" write="true" write_requirement="optional"/>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
     </characteristic>
     
     <!--Intensity-->
     <characteristic id="led_intensity" name="Intensity" sourceId="custom.type" uuid="07f15833-d39b-4eb3-a5f8-863fd642a27f">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties read="true" read_requirement="optional" write="true" write_requirement="optional"/>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
     </characteristic>
   </service>
   
@@ -116,21 +116,21 @@
     <characteristic id="speaker_on_off" name="On/Off" sourceId="custom.type" uuid="2e729421-a4f2-45c6-9cd1-fbb534a77844">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties write="true" write_requirement="mandatory"/>
+      <properties authenticated_write="true" authenticated_write_requirement="optional"/>
     </characteristic>
     
     <!--Pitch-->
     <characteristic id="speaker_pitch" name="Pitch" sourceId="custom.type" uuid="e5f08409-545b-46e4-84c5-4861f08c0bab">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties read="true" read_requirement="mandatory" write="true" write_requirement="mandatory"/>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
     </characteristic>
     
     <!--Volume-->
     <characteristic id="speaker_volume" name="Volume" sourceId="custom.type" uuid="32e81b8c-93e5-44ca-884f-bcfc6b1b2d79">
       <informativeText>Custom characteristic</informativeText>
       <value length="1" type="hex" variable_length="false">0x00</value>
-      <properties read="true" read_requirement="mandatory" write="true" write_requirement="mandatory"/>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
     </characteristic>
   </service>
 </gatt>
