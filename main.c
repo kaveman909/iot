@@ -80,11 +80,14 @@ uint8_t boot_to_dfu = 0;
 #include "event.h"
 #include "i2c.h"
 #include "ps_keys.h"
-//#include <stdio.h>
+#include "graphics.h"
+#include <stdio.h>
 
 //***********************************************************************************
 // defined files
 //***********************************************************************************
+#define USE_LCD_DISPLAY
+
 #define LED_ON_TIME_MS        50
 #define LED_PERIOD_STEP_MS    100
 //#define LED_TIMEOUT_SEC       30
@@ -123,7 +126,7 @@ static const uint8_t gattdb_ps_default_data[] = {
 		default_led_blink_rate, default_led_intensity, default_speaker_pitch, default_speaker_volume
 };
 static ps_data_t ps_data;
-volatile static uint32_t passkey;
+//volatile static uint32_t passkey;
 static uint8_t bonding_handle;
 
 //***********************************************************************************
@@ -134,9 +137,20 @@ static uint8_t bonding_handle;
 // functions
 //***********************************************************************************
 
-//***********************************************************************************
-// main
-//***********************************************************************************
+static void graphics_init(void) {
+#ifdef USE_LCD_DISPLAY
+	GRAPHICS_Init();
+#endif
+}
+
+static void graphics_println(char * str) {
+#ifdef USE_LCD_DISPLAY
+	GRAPHICS_Clear();
+	GRAPHICS_AppendString(str);
+	GRAPHICS_AppendString("\n");
+	GRAPHICS_Update();
+#endif
+}
 
 /** Source code for "temperatureMeasure" function modified from SiLabs Example Project "soc-thermometer"
  * Due credit is given to SiLabs. */
@@ -176,6 +190,11 @@ void ps_keys_init(uint8_t ps_att_len, const uint8_t * ps_att_data, const uint8_t
 		}
 	}
 }
+
+//***********************************************************************************
+// main
+//***********************************************************************************
+
 /**
  * @brief  Main function
  */
@@ -198,12 +217,15 @@ int main(void) {
 	letimer_clock_init();
 	letimer_init();
 	i2c_setup();
+	graphics_init();
+	graphics_println("Waiting for\nconnection...");
 	while (1) {
 		/* Event pointer for handling events */
 		struct gecko_cmd_packet* evt;
 		int16_t tx_level;
 		static int16_t tx_level_hist = 0;
 		int8_t rssi;
+		char passkey_str[30];
 		/* Check for stack event. */
 		evt = gecko_wait_event();
 
@@ -227,7 +249,7 @@ int main(void) {
 			/* Accept new bondings */
 			gecko_cmd_sm_set_bondable_mode(1);
 			/* Set hard-coded passkey for now */
-			gecko_cmd_sm_set_passkey(123456);
+			//gecko_cmd_sm_set_passkey(123456);
 			/* Set advertising parameters. 100ms advertisement interval. All channels used.
 			 * The first two parameters are minimum and maximum advertising interval, both in
 			 * units of (milliseconds * 1.6). The third parameter '7' sets advertising on all channels. */
@@ -246,10 +268,13 @@ int main(void) {
 			break;
 
 		case gecko_evt_sm_passkey_display_id:
-			passkey = evt->data.evt_sm_passkey_display.passkey;
+			//passkey = evt->data.evt_sm_passkey_display.passkey;
+			sprintf(passkey_str, "Passkey:\n%u", (unsigned int)evt->data.evt_sm_passkey_display.passkey);
+			graphics_println(passkey_str);
 			break;
 
 		case gecko_evt_sm_bonded_id:
+			graphics_println("Bonded!");
 			break;
 
 		case gecko_evt_sm_bonding_failed_id:
@@ -259,6 +284,9 @@ int main(void) {
 			if (bonding_handle != 0xff) {
 				gecko_cmd_sm_delete_bonding(bonding_handle);
 			}
+			GRAPHICS_Clear();
+			GRAPHICS_AppendString("Bonding\nFailed\n");
+			GRAPHICS_Update();
 			break;
 
 		case gecko_evt_le_connection_opened_id:
