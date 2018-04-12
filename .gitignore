@@ -1,0 +1,7 @@
+GNU*ARM*/
+*.bak
+*.hex
+*.gbl
+*.s37
+.settings/
+BgBuild_Log*
