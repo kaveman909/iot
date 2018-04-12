@@ -81,4 +81,56 @@
       <properties indicate="true" indicate_requirement="mandatory" notify="false" notify_requirement="excluded" read="false" read_requirement="excluded" reliable_write="false" reliable_write_requirement="excluded" write="false" write_no_response="false" write_no_response_requirement="excluded" write_requirement="excluded"/>
     </characteristic>
   </service>
+  
+  <!--LED Control-->
+  <service advertise="false" id="led_control" name="LED Control" requirement="mandatory" sourceId="custom.type" type="primary" uuid="7ac8e949-3d1c-4e1f-8e33-29100625eb06">
+    <informativeText>Custom service</informativeText>
+    
+    <!--On/Off-->
+    <characteristic id="led_on_off" name="On/Off" sourceId="custom.type" uuid="30432380-fd30-4543-b0dc-c891606e7551">
+      <informativeText>Custom characteristic</informativeText>
+      <value length="1" type="hex" variable_length="false">0x00</value>
+      <properties authenticated_write="true" authenticated_write_requirement="optional"/>
+    </characteristic>
+    
+    <!--Blink Rate-->
+    <characteristic id="led_blink_rate" name="Blink Rate" sourceId="custom.type" uuid="2cba242d-643c-489b-aad9-beea762764aa">
+      <informativeText>Custom characteristic</informativeText>
+      <value length="1" type="hex" variable_length="false">0x00</value>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
+    </characteristic>
+    
+    <!--Intensity-->
+    <characteristic id="led_intensity" name="Intensity" sourceId="custom.type" uuid="07f15833-d39b-4eb3-a5f8-863fd642a27f">
+      <informativeText>Custom characteristic</informativeText>
+      <value length="1" type="hex" variable_length="false">0x00</value>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
+    </characteristic>
+  </service>
+  
+  <!--Speaker Control-->
+  <service advertise="false" id="speaker_control" name="Speaker Control" requirement="mandatory" sourceId="custom.type" type="primary" uuid="b8059629-f548-4f5d-a923-4ee141649921">
+    <informativeText>Custom service</informativeText>
+    
+    <!--On/Off-->
+    <characteristic id="speaker_on_off" name="On/Off" sourceId="custom.type" uuid="2e729421-a4f2-45c6-9cd1-fbb534a77844">
+      <informativeText>Custom characteristic</informativeText>
+      <value length="1" type="hex" variable_length="false">0x00</value>
+      <properties authenticated_write="true" authenticated_write_requirement="optional"/>
+    </characteristic>
+    
+    <!--Pitch-->
+    <characteristic id="speaker_pitch" name="Pitch" sourceId="custom.type" uuid="e5f08409-545b-46e4-84c5-4861f08c0bab">
+      <informativeText>Custom characteristic</informativeText>
+      <value length="1" type="hex" variable_length="false">0x00</value>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
+    </characteristic>
+    
+    <!--Volume-->
+    <characteristic id="speaker_volume" name="Volume" sourceId="custom.type" uuid="32e81b8c-93e5-44ca-884f-bcfc6b1b2d79">
+      <informativeText>Custom characteristic</informativeText>
+      <value length="1" type="hex" variable_length="false">0x00</value>
+      <properties authenticated_read="true" authenticated_read_requirement="optional" authenticated_write="true" authenticated_write_requirement="optional"/>
+    </characteristic>
+  </service>
 </gatt>
