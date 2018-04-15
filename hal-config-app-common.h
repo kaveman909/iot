@@ -8,8 +8,8 @@
 #include "hal-config-ioexp.h"
 #endif
 
-#if defined(FEATURE_LNA)
-#include "hal-config-lna.h"
+#if defined(FEATURE_FEM)
+#include "hal-config-fem.h"
 #endif
 
 #define HAL_EXTFLASH_FREQUENCY                        (1000000)

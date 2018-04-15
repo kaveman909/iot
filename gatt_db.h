@@ -24,5 +24,8 @@ extern const struct bg_gattdb_def bg_gattdb_data;
 #define gattdb_speaker_on_off                  37
 #define gattdb_speaker_pitch                   39
 #define gattdb_speaker_volume                  41
+#define gattdb_angular_vel_rt                  44
+#define gattdb_angular_vel_avg                 47
+#define gattdb_time_of_flight                  49
 
 #endif

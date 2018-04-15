@@ -52,7 +52,7 @@ void initMcu(void)
   rtccInit.precntWrapOnCCV0      = false;
   rtccInit.cntWrapOnCCV1         = false;
   rtccInit.prescMode             = rtccCntTickPresc;
-  rtccInit.presc                 = rtccCntPresc_32;
+  rtccInit.presc                 = rtccCntPresc_1;
   rtccInit.enaOSCFailDetect      = false;
   rtccInit.cntMode               = rtccCntModeNormal;
   RTCC_Init(&rtccInit);
@@ -94,6 +94,9 @@ static void initMcu_clocks(void)
 
   // HFRCO not needed when using HFXO
   CMU_OscillatorEnable(cmuOsc_HFRCO, false, false);
+
+  // Enabling HFBUSCLKLE clock for LE peripherals
+  CMU_ClockEnable(cmuClock_HFLE, true);
 
   // Initialize LFXO
   CMU_LFXOInit_TypeDef lfxoInit = BSP_CLK_LFXO_INIT;
