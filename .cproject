@@ -63,7 +63,6 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/Device/SiliconLabs/EFR32BG1B/Source/GCC}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/Device/SiliconLabs/EFR32BG1B/Source}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/bootloader}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/emdrv/dmadrv/inc}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/middleware/glib}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/util/silicon_labs/silabs_core/graphics}&quot;"/>
@@ -110,7 +109,6 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/Device/SiliconLabs/EFR32BG1B/Source/GCC}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/Device/SiliconLabs/EFR32BG1B/Source}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/bootloader}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/emdrv/dmadrv/inc}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/platform/middleware/glib}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/util/silicon_labs/silabs_core/graphics}&quot;"/>
