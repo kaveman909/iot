@@ -236,7 +236,6 @@ int main(void) {
 		 * Here the system is set to start advertising immediately after boot procedure. */
 		case gecko_evt_system_boot_id:
 			gecko_cmd_sm_delete_bondings();
-			//printf("System boot\r\n");
 			/* Set up bonding (flags = 0b0111 = 0x07):
 			 * (0:1) Bonding requires MITM protection
 			 * (1:1) Encryption requires bonding
@@ -248,19 +247,18 @@ int main(void) {
 			gecko_cmd_sm_configure(0x07, sm_io_capability_displayonly);
 			/* Accept new bondings */
 			gecko_cmd_sm_set_bondable_mode(1);
-			/* Set hard-coded passkey for now */
-			//gecko_cmd_sm_set_passkey(123456);
 			/* Set advertising parameters. 100ms advertisement interval. All channels used.
 			 * The first two parameters are minimum and maximum advertising interval, both in
 			 * units of (milliseconds * 1.6). The third parameter '7' sets advertising on all channels. */
 			gecko_cmd_le_gap_set_adv_parameters((uint16_t)(ADVERT_MIN_MS * 1.6f), (uint16_t)(ADVERT_MAX_MS * 1.6f), 7);
 
+			/* Reset output power to default dBm */
+			gecko_cmd_system_set_tx_power(ADVERT_TX_DEFAULT_dBm);
+
 			/* Start general advertising and enable connections. */
 			gecko_cmd_le_gap_set_mode(le_gap_general_discoverable,
 					le_gap_undirected_connectable);
 
-			/* Reset output power to 0 dBm */
-			gecko_cmd_system_set_tx_power(0);
 
 			/* Initialize PS data */
 

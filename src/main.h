@@ -12,12 +12,13 @@
 // defined files
 //***********************************************************************************
 
-#define ADVERT_MIN_MS		337
-#define ADVERT_MAX_MS		337
-#define CON_INT_MIN			50 // 60 * 1.25 = 75 ms
-#define CON_INT_MAX			50 // 60 * 1.25 = 75 ms
-#define SLAVE_LATENCY		5
-#define SUP_TIMEOUT			300
+#define ADVERT_TX_DEFAULT_dBm 0
+#define ADVERT_MIN_MS         337
+#define ADVERT_MAX_MS         337
+#define CON_INT_MIN           50 // 60 * 1.25 = 75 ms
+#define CON_INT_MAX           50 // 60 * 1.25 = 75 ms
+#define SLAVE_LATENCY         5
+#define SUP_TIMEOUT           300
 
 //***********************************************************************************
 // global variables
