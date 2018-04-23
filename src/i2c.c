@@ -25,8 +25,6 @@
 
 #define I2C_SLAVE_ADDR 0x40 // address of Si7021
 #define CMD_MEAS_TEMP_NO_HOLD 0xF3
-#define WRITE_BIT 0
-#define READ_BIT 1
 
 static I2C_Init_TypeDef i2c_init = I2C_INIT_DEFAULT;
 static uint16_t data_lsb;

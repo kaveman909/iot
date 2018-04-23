@@ -11,6 +11,8 @@
 // I2C Address
 #define IMU_I2C_ADDRESS 0x68 // default
 
+#define NUM_OF_CONFIG_CMDS 8
+
 // Registers
 #define IMU_PWR_MGMT_1      0x6b
 #define IMU_PWR_MGMT_2      0x6c
@@ -36,11 +38,19 @@
 // enable accel hardware intelligence
 #define IMU_MOT_DETECT_CTRL_CONFIG 0xC0 // ACCEL_INTEL_EN / ACCEL_INTEL_MODE
 // set motion threshold
-#define IMU_MOTION_THRESHOLD       0x01 // 0g
-#define IMU_WOM_THR_CONFIG         IMU_MOTION_THRESHOLD
+#define IMU_MOTION_THRESHOLD_MG    40
+#define IMU_WOM_THR_CONFIG         (IMU_MOTION_THRESHOLD_MG / 4)
 // set freq of wakeup
 #define IMU_LP_ACCEL_ODR_CONFIG    0x02 // ~ 1 Hz wakeup
 // enable cycle mode (accel low power mode)
 #define IMU_PWR_MGMT_1_CONFIG2     0x21 // CYCLE + default
 
 #endif /* IMU_H_ */
+
+// public functions
+void imu_init(void);
+void imu_init_sched(void);
+void imu_start_write(void);
+void imu_config_addr(void);
+void imu_config_data(void);
+void imu_config_next(void);

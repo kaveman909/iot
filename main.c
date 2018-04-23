@@ -81,6 +81,7 @@ uint8_t boot_to_dfu = 0;
 #include "i2c.h"
 #include "ps_keys.h"
 #include "graphics.h"
+#include "imu.h"
 #include <stdio.h>
 
 //***********************************************************************************
@@ -154,6 +155,7 @@ static void graphics_println(char * str) {
 
 /** Source code for "temperatureMeasure" function modified from SiLabs Example Project "soc-thermometer"
  * Due credit is given to SiLabs. */
+#if 0
 static void temperatureMeasure(void) {
 	uint8_t htmTempBuffer[5]; /* Stores the temperature data in the Health Thermometer (HTM) format. */
 	uint8_t flags = 0x00; /* HTM flags set as 0 for Celsius, no time stamp and no temperature type. */
@@ -174,6 +176,7 @@ static void temperatureMeasure(void) {
 	gecko_cmd_gatt_server_send_characteristic_notification(0xFF,
 			gattdb_temperature_measurement, 5, htmTempBuffer);
 }
+#endif
 
 void ps_keys_init(uint8_t ps_att_len, const uint8_t * ps_att_data, const uint8_t * ps_att_default_data, ps_data_t * ps_data) {
 	for (int i = 0; i < ps_att_len; i++) {
@@ -189,6 +192,15 @@ void ps_keys_init(uint8_t ps_att_len, const uint8_t * ps_att_data, const uint8_t
 			ps_data->data[i] = temp->value.data[0];
 		}
 	}
+}
+
+static bool check_ef(uint32_t * ef, uint32_t events) {
+	bool ret = false;
+	if ((*ef & events) == events ){
+		ret = true;
+		*ef &= ~events;
+	}
+	return ret;
 }
 
 //***********************************************************************************
@@ -215,8 +227,9 @@ int main(void) {
 
 	// Initialize LETIMER
 	letimer_clock_init();
-	letimer_init();
+	//letimer_init();
 	i2c_setup();
+	imu_init();
 	graphics_init();
 	graphics_println("Waiting for\nconnection...");
 	while (1) {
@@ -404,6 +417,7 @@ int main(void) {
 			break;
 
 		case gecko_evt_system_external_signal_id:
+/*
 			if (event_flag & START_TEMPERATURE_POR) {
 				event_flag &= ~START_TEMPERATURE_POR;
 				i2c_sensor_por();
@@ -448,6 +462,19 @@ int main(void) {
 				i2c_load_stop_cmd();
 				letimer_update_compare1();
 			}
+*/
+			if (check_ef(&event_flag, LOAD_IMU_START_WRITE)) {
+				imu_init_sched();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_CONFIG_ADDR | ACK_RECEIVED)) {
+				imu_config_addr();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_CONFIG_DATA | ACK_RECEIVED)) {
+				imu_config_data();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_CONFIG_NEXT | ACK_RECEIVED)) {
+				imu_config_next();
+			}
 			break;
 
 		default:
@@ -455,6 +482,7 @@ int main(void) {
 		}
 	}
 }
+
 
 /** @} (end addtogroup app) */
 /** @} (end addtogroup Application) */
