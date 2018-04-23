@@ -8,6 +8,26 @@
 #ifndef IMU_H_
 #define IMU_H_
 
+// Configuration parameters
+#define IMU_MOTION_THRESHOLD_MG    40
+/*
+Lposc_clksel Output Frequency (Hz)
+0 0.24
+1 0.49
+2 0.98
+3 1.95
+4 3.91
+5 7.81
+6 15.63
+7 31.25
+8 62.50
+9 125
+10 250
+11 500
+12-15 RESERVED
+*/
+#define IMU_MOTION_UPDATE_RATE_HZ 5
+
 // I2C Address
 #define IMU_I2C_ADDRESS 0x68 // default
 
@@ -38,10 +58,9 @@
 // enable accel hardware intelligence
 #define IMU_MOT_DETECT_CTRL_CONFIG 0xC0 // ACCEL_INTEL_EN / ACCEL_INTEL_MODE
 // set motion threshold
-#define IMU_MOTION_THRESHOLD_MG    40
 #define IMU_WOM_THR_CONFIG         (IMU_MOTION_THRESHOLD_MG / 4)
 // set freq of wakeup
-#define IMU_LP_ACCEL_ODR_CONFIG    0x02 // ~ 1 Hz wakeup
+#define IMU_LP_ACCEL_ODR_CONFIG    IMU_MOTION_UPDATE_RATE_HZ
 // enable cycle mode (accel low power mode)
 #define IMU_PWR_MGMT_1_CONFIG2     0x21 // CYCLE + default
 
@@ -54,3 +73,4 @@ void imu_start_write(void);
 void imu_config_addr(void);
 void imu_config_data(void);
 void imu_config_next(void);
+void imu_interrupt_handler(void);

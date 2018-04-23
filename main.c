@@ -248,7 +248,7 @@ int main(void) {
 		 * Do not call any stack commands before receiving the boot event.
 		 * Here the system is set to start advertising immediately after boot procedure. */
 		case gecko_evt_system_boot_id:
-			gecko_cmd_sm_delete_bondings();
+			//gecko_cmd_sm_delete_bondings();
 			/* Set up bonding (flags = 0b0111 = 0x07):
 			 * (0:1) Bonding requires MITM protection
 			 * (1:1) Encryption requires bonding
@@ -279,7 +279,7 @@ int main(void) {
 			break;
 
 		case gecko_evt_sm_passkey_display_id:
-			//passkey = evt->data.evt_sm_passkey_display.passkey;
+			// passkey will be a random 6-digit number
 			sprintf(passkey_str, "Passkey:\n%u", (unsigned int)evt->data.evt_sm_passkey_display.passkey);
 			graphics_println(passkey_str);
 			break;
@@ -295,9 +295,7 @@ int main(void) {
 			if (bonding_handle != 0xff) {
 				gecko_cmd_sm_delete_bonding(bonding_handle);
 			}
-			GRAPHICS_Clear();
-			GRAPHICS_AppendString("Bonding\nFailed\n");
-			GRAPHICS_Update();
+			graphics_println("Bonding\nFailed");
 			break;
 
 		case gecko_evt_le_connection_opened_id:
@@ -306,6 +304,7 @@ int main(void) {
 			gecko_cmd_sm_increase_security(connection);
 			bonding_handle = evt->data.evt_le_connection_opened.bonding;
 			if (bonding_handle != 0xff) {
+				graphics_println("Connected!");
 				gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			}
 			gecko_cmd_le_connection_get_rssi(connection);
@@ -344,6 +343,7 @@ int main(void) {
 				} else if (evt->data.evt_hardware_soft_timer.handle == LED_TIMEOUT_HANDLE) {
 					GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
 					gecko_cmd_hardware_set_soft_timer(0, LED_BLINK_RATE_HANDLE, true);
+					graphics_println("Stop LED");
 				}
 		        break;
 
@@ -387,6 +387,7 @@ int main(void) {
 					GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
 					gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
 					gecko_cmd_hardware_set_soft_timer((ps_data.s.led_intensity * LFO_HZ), LED_TIMEOUT_HANDLE, true);
+					graphics_println("Begin LED\nflashing...");
 				}
 			}
 			break;
@@ -474,6 +475,9 @@ int main(void) {
 			}
 			if (check_ef(&event_flag, LOAD_IMU_CONFIG_NEXT | ACK_RECEIVED)) {
 				imu_config_next();
+			}
+			if (check_ef(&event_flag, IMU_MOTION_INTERRUPT)) {
+				graphics_println("Motion\nDetected!");
 			}
 			break;
 
