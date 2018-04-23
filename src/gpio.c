@@ -34,4 +34,6 @@ void gpio_init(void){
 
 	GPIO_DriveStrengthSet(LED_BW_port, gpioDriveStrengthStrongAlternateStrong);
 	GPIO_PinModeSet(LED_BW_port, LED_BW_pin, gpioModePushPull, LED_BW_default);
+
+	GPIO_PinModeSet(IMU_INT_port, IMU_INT_pin, gpioModeInput, 0);
 }
