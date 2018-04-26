@@ -25,7 +25,6 @@
 // functions
 //***********************************************************************************
 
-static volatile uint32_t irq_test = 0;
 void gpio_interrupt_callback(uint8_t pin) {
 	if (pin == IMU_INT_pin) {
 		event_flag |= IMU_MOTION_INTERRUPT;

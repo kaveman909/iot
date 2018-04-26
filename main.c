@@ -141,15 +141,22 @@ static uint8_t bonding_handle;
 static void graphics_init(void) {
 #ifdef USE_LCD_DISPLAY
 	GRAPHICS_Init();
+	GRAPHICS_Clear();
 #endif
 }
 
+#define GRAPHICS_LINE_COUNT_LIMIT 11
 static void graphics_println(char * str) {
 #ifdef USE_LCD_DISPLAY
-	GRAPHICS_Clear();
+	static uint32_t graphics_line_count = 0;
+	if (graphics_line_count > GRAPHICS_LINE_COUNT_LIMIT) {
+		GRAPHICS_Clear();
+		graphics_line_count = 0;
+	}
 	GRAPHICS_AppendString(str);
-	GRAPHICS_AppendString("\n");
+	//GRAPHICS_AppendString("\n");
 	GRAPHICS_Update();
+	graphics_line_count++;
 #endif
 }
 
@@ -231,7 +238,8 @@ int main(void) {
 	i2c_setup();
 	imu_init();
 	graphics_init();
-	graphics_println("Waiting for\nconnection...");
+	graphics_println("Waiting for");
+	graphics_println("connection...");
 	while (1) {
 		/* Event pointer for handling events */
 		struct gecko_cmd_packet* evt;
@@ -280,7 +288,8 @@ int main(void) {
 
 		case gecko_evt_sm_passkey_display_id:
 			// passkey will be a random 6-digit number
-			sprintf(passkey_str, "Passkey:\n%u", (unsigned int)evt->data.evt_sm_passkey_display.passkey);
+			sprintf(passkey_str, "%u", (unsigned int)evt->data.evt_sm_passkey_display.passkey);
+			graphics_println("Passkey:");
 			graphics_println(passkey_str);
 			break;
 
@@ -295,7 +304,7 @@ int main(void) {
 			if (bonding_handle != 0xff) {
 				gecko_cmd_sm_delete_bonding(bonding_handle);
 			}
-			graphics_println("Bonding\nFailed");
+			graphics_println("Bonding Failed");
 			break;
 
 		case gecko_evt_le_connection_opened_id:
@@ -324,6 +333,7 @@ int main(void) {
 						le_gap_undirected_connectable);
 			}
 			gecko_cmd_hardware_set_soft_timer(0, 0, 0);
+			graphics_println("Disconnected");
 			break;
 
 			/* Events related to OTA upgrading
@@ -387,7 +397,8 @@ int main(void) {
 					GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
 					gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
 					gecko_cmd_hardware_set_soft_timer((ps_data.s.led_intensity * LFO_HZ), LED_TIMEOUT_HANDLE, true);
-					graphics_println("Begin LED\nflashing...");
+					graphics_println("Begin LED");
+					graphics_println("flashing...");
 				}
 			}
 			break;
@@ -477,7 +488,8 @@ int main(void) {
 				imu_config_next();
 			}
 			if (check_ef(&event_flag, IMU_MOTION_INTERRUPT)) {
-				graphics_println("Motion\nDetected!");
+				graphics_println("Motion");
+				graphics_println("Detected!");
 			}
 			break;
 
