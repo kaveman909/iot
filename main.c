@@ -101,8 +101,14 @@ uint8_t boot_to_dfu = 0;
 #define LED_PERIOD_STEP_LFO   (LED_PERIOD_STEP_NS/LFO_NS)
 //#define LED_TIMEOUT_LFO       (LED_TIMEOUT_SEC * LFO_HZ)
 
-#define LED_BLINK_RATE_HANDLE 1
-#define LED_TIMEOUT_HANDLE    2
+#define MOTION_TIMEOUT_INTERVAL_MS 500UL
+#define MOTION_TIMEOUT_INTERVAL ((32768UL * MOTION_TIMEOUT_INTERVAL_MS)/1000UL)
+
+typedef enum {
+  LED_BLINK_RATE_HANDLE = 1,
+  LED_TIMEOUT_HANDLE,
+  MOTION_TIMEOUT_HANDLE
+} soft_timer_handle_t;
 
 // Private Types
 typedef union {
@@ -127,8 +133,11 @@ static const uint8_t gattdb_ps_default_data[] = {
 		default_led_blink_rate, default_led_intensity, default_speaker_pitch, default_speaker_volume
 };
 static ps_data_t ps_data;
-//volatile static uint32_t passkey;
 static uint8_t bonding_handle;
+
+static bool motion_timer_started = false;
+static uint32_t motion_detection_count = 0;
+static uint32_t time_in_flight = 0;
 
 //***********************************************************************************
 // function prototypes
@@ -154,7 +163,6 @@ static void graphics_println(char * str) {
 		graphics_line_count = 0;
 	}
 	GRAPHICS_AppendString(str);
-	//GRAPHICS_AppendString("\n");
 	GRAPHICS_Update();
 	graphics_line_count++;
 #endif
@@ -340,9 +348,11 @@ int main(void) {
 			 ----------------------------------------------------------------------------- */
 
 		case gecko_evt_hardware_soft_timer_id:
-				if (evt->data.evt_hardware_soft_timer.handle == 0) {
+			switch (evt->data.evt_hardware_soft_timer.handle){
+			case 0:
 					gecko_cmd_le_connection_get_rssi(connection);
-				} else if (evt->data.evt_hardware_soft_timer.handle == LED_BLINK_RATE_HANDLE) {
+					break;
+			case LED_BLINK_RATE_HANDLE:
 					if(GPIO_PinOutGet(LED_BW_port, LED_BW_pin)) {
 						GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
 						gecko_cmd_hardware_set_soft_timer((LED_PERIOD_STEP_LFO * ps_data.s.led_blink_rate) - LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
@@ -350,12 +360,25 @@ int main(void) {
 						GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
 						gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
 					}
-				} else if (evt->data.evt_hardware_soft_timer.handle == LED_TIMEOUT_HANDLE) {
+					break;
+			case LED_TIMEOUT_HANDLE:
 					GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
 					gecko_cmd_hardware_set_soft_timer(0, LED_BLINK_RATE_HANDLE, true);
 					graphics_println("Stop LED");
+					break;
+			case MOTION_TIMEOUT_HANDLE:
+				time_in_flight += MOTION_TIMEOUT_INTERVAL_MS;
+				if (motion_detection_count == 0) {
+					// disc has stopped moving; stop timer
+					gecko_cmd_hardware_set_soft_timer(0, MOTION_TIMEOUT_HANDLE, false);
+					// TODO:  process time in flight (send indication)
+
+					time_in_flight = 0;
+					motion_timer_started = false;
 				}
-		        break;
+				motion_detection_count = 0;
+			}
+		    break;
 
 		/* Check if the user-type OTA Control Characteristic was written.
 		 * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
@@ -490,6 +513,11 @@ int main(void) {
 			if (check_ef(&event_flag, IMU_MOTION_INTERRUPT)) {
 				graphics_println("Motion");
 				graphics_println("Detected!");
+				if (!motion_timer_started) {
+					motion_timer_started = true;
+					gecko_cmd_hardware_set_soft_timer(MOTION_TIMEOUT_INTERVAL, MOTION_TIMEOUT_HANDLE, false);
+				}
+				motion_detection_count++;
 			}
 			break;
 
