@@ -81,6 +81,7 @@ uint8_t boot_to_dfu = 0;
 #include "i2c.h"
 #include "ps_keys.h"
 #include "graphics.h"
+#include "imu.h"
 #include <stdio.h>
 
 //***********************************************************************************
@@ -100,8 +101,14 @@ uint8_t boot_to_dfu = 0;
 #define LED_PERIOD_STEP_LFO   (LED_PERIOD_STEP_NS/LFO_NS)
 //#define LED_TIMEOUT_LFO       (LED_TIMEOUT_SEC * LFO_HZ)
 
-#define LED_BLINK_RATE_HANDLE 1
-#define LED_TIMEOUT_HANDLE    2
+#define MOTION_TIMEOUT_INTERVAL_MS 500UL
+#define MOTION_TIMEOUT_INTERVAL ((32768UL * MOTION_TIMEOUT_INTERVAL_MS)/1000UL)
+
+typedef enum {
+  LED_BLINK_RATE_HANDLE = 1,
+  LED_TIMEOUT_HANDLE,
+  MOTION_TIMEOUT_HANDLE
+} soft_timer_handle_t;
 
 // Private Types
 typedef union {
@@ -126,8 +133,11 @@ static const uint8_t gattdb_ps_default_data[] = {
 		default_led_blink_rate, default_led_intensity, default_speaker_pitch, default_speaker_volume
 };
 static ps_data_t ps_data;
-//volatile static uint32_t passkey;
 static uint8_t bonding_handle;
+
+static bool motion_timer_started = false;
+static uint32_t motion_detection_count = 0;
+static uint32_t time_in_flight = 0;
 
 //***********************************************************************************
 // function prototypes
@@ -140,20 +150,27 @@ static uint8_t bonding_handle;
 static void graphics_init(void) {
 #ifdef USE_LCD_DISPLAY
 	GRAPHICS_Init();
+	GRAPHICS_Clear();
 #endif
 }
 
+#define GRAPHICS_LINE_COUNT_LIMIT 11
 static void graphics_println(char * str) {
 #ifdef USE_LCD_DISPLAY
-	GRAPHICS_Clear();
+	static uint32_t graphics_line_count = 0;
+	if (graphics_line_count > GRAPHICS_LINE_COUNT_LIMIT) {
+		GRAPHICS_Clear();
+		graphics_line_count = 0;
+	}
 	GRAPHICS_AppendString(str);
-	GRAPHICS_AppendString("\n");
 	GRAPHICS_Update();
+	graphics_line_count++;
 #endif
 }
 
 /** Source code for "temperatureMeasure" function modified from SiLabs Example Project "soc-thermometer"
  * Due credit is given to SiLabs. */
+#if 0
 static void temperatureMeasure(void) {
 	uint8_t htmTempBuffer[5]; /* Stores the temperature data in the Health Thermometer (HTM) format. */
 	uint8_t flags = 0x00; /* HTM flags set as 0 for Celsius, no time stamp and no temperature type. */
@@ -174,6 +191,7 @@ static void temperatureMeasure(void) {
 	gecko_cmd_gatt_server_send_characteristic_notification(0xFF,
 			gattdb_temperature_measurement, 5, htmTempBuffer);
 }
+#endif
 
 void ps_keys_init(uint8_t ps_att_len, const uint8_t * ps_att_data, const uint8_t * ps_att_default_data, ps_data_t * ps_data) {
 	for (int i = 0; i < ps_att_len; i++) {
@@ -189,6 +207,15 @@ void ps_keys_init(uint8_t ps_att_len, const uint8_t * ps_att_data, const uint8_t
 			ps_data->data[i] = temp->value.data[0];
 		}
 	}
+}
+
+static bool check_ef(uint32_t * ef, uint32_t events) {
+	bool ret = false;
+	if ((*ef & events) == events ){
+		ret = true;
+		*ef &= ~events;
+	}
+	return ret;
 }
 
 //***********************************************************************************
@@ -215,10 +242,12 @@ int main(void) {
 
 	// Initialize LETIMER
 	letimer_clock_init();
-	letimer_init();
+	//letimer_init();
 	i2c_setup();
+	imu_init();
 	graphics_init();
-	graphics_println("Waiting for\nconnection...");
+	graphics_println("Waiting for");
+	graphics_println("connection...");
 	while (1) {
 		/* Event pointer for handling events */
 		struct gecko_cmd_packet* evt;
@@ -235,8 +264,7 @@ int main(void) {
 		 * Do not call any stack commands before receiving the boot event.
 		 * Here the system is set to start advertising immediately after boot procedure. */
 		case gecko_evt_system_boot_id:
-			gecko_cmd_sm_delete_bondings();
-			//printf("System boot\r\n");
+			//gecko_cmd_sm_delete_bondings();
 			/* Set up bonding (flags = 0b0111 = 0x07):
 			 * (0:1) Bonding requires MITM protection
 			 * (1:1) Encryption requires bonding
@@ -248,19 +276,18 @@ int main(void) {
 			gecko_cmd_sm_configure(0x07, sm_io_capability_displayonly);
 			/* Accept new bondings */
 			gecko_cmd_sm_set_bondable_mode(1);
-			/* Set hard-coded passkey for now */
-			//gecko_cmd_sm_set_passkey(123456);
 			/* Set advertising parameters. 100ms advertisement interval. All channels used.
 			 * The first two parameters are minimum and maximum advertising interval, both in
 			 * units of (milliseconds * 1.6). The third parameter '7' sets advertising on all channels. */
 			gecko_cmd_le_gap_set_adv_parameters((uint16_t)(ADVERT_MIN_MS * 1.6f), (uint16_t)(ADVERT_MAX_MS * 1.6f), 7);
 
+			/* Reset output power to default dBm */
+			gecko_cmd_system_set_tx_power(ADVERT_TX_DEFAULT_dBm);
+
 			/* Start general advertising and enable connections. */
 			gecko_cmd_le_gap_set_mode(le_gap_general_discoverable,
 					le_gap_undirected_connectable);
 
-			/* Reset output power to 0 dBm */
-			gecko_cmd_system_set_tx_power(0);
 
 			/* Initialize PS data */
 
@@ -268,8 +295,9 @@ int main(void) {
 			break;
 
 		case gecko_evt_sm_passkey_display_id:
-			//passkey = evt->data.evt_sm_passkey_display.passkey;
-			sprintf(passkey_str, "Passkey:\n%u", (unsigned int)evt->data.evt_sm_passkey_display.passkey);
+			// passkey will be a random 6-digit number
+			sprintf(passkey_str, "%u", (unsigned int)evt->data.evt_sm_passkey_display.passkey);
+			graphics_println("Passkey:");
 			graphics_println(passkey_str);
 			break;
 
@@ -284,9 +312,7 @@ int main(void) {
 			if (bonding_handle != 0xff) {
 				gecko_cmd_sm_delete_bonding(bonding_handle);
 			}
-			GRAPHICS_Clear();
-			GRAPHICS_AppendString("Bonding\nFailed\n");
-			GRAPHICS_Update();
+			graphics_println("Bonding Failed");
 			break;
 
 		case gecko_evt_le_connection_opened_id:
@@ -295,6 +321,7 @@ int main(void) {
 			gecko_cmd_sm_increase_security(connection);
 			bonding_handle = evt->data.evt_le_connection_opened.bonding;
 			if (bonding_handle != 0xff) {
+				graphics_println("Connected!");
 				gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			}
 			gecko_cmd_le_connection_get_rssi(connection);
@@ -314,15 +341,21 @@ int main(void) {
 						le_gap_undirected_connectable);
 			}
 			gecko_cmd_hardware_set_soft_timer(0, 0, 0);
+			graphics_println("Disconnected");
+			connection = 0;  // indicates no longer connected
 			break;
 
 			/* Events related to OTA upgrading
 			 ----------------------------------------------------------------------------- */
 
 		case gecko_evt_hardware_soft_timer_id:
-				if (evt->data.evt_hardware_soft_timer.handle == 0) {
-					gecko_cmd_le_connection_get_rssi(connection);
-				} else if (evt->data.evt_hardware_soft_timer.handle == LED_BLINK_RATE_HANDLE) {
+			switch (evt->data.evt_hardware_soft_timer.handle){
+			case 0:
+				    if (connection) {
+				    	gecko_cmd_le_connection_get_rssi(connection);
+				    }
+					break;
+			case LED_BLINK_RATE_HANDLE:
 					if(GPIO_PinOutGet(LED_BW_port, LED_BW_pin)) {
 						GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
 						gecko_cmd_hardware_set_soft_timer((LED_PERIOD_STEP_LFO * ps_data.s.led_blink_rate) - LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
@@ -330,11 +363,33 @@ int main(void) {
 						GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
 						gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
 					}
-				} else if (evt->data.evt_hardware_soft_timer.handle == LED_TIMEOUT_HANDLE) {
+					break;
+			case LED_TIMEOUT_HANDLE:
 					GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
 					gecko_cmd_hardware_set_soft_timer(0, LED_BLINK_RATE_HANDLE, true);
+					graphics_println("Stop LED");
+					break;
+			case MOTION_TIMEOUT_HANDLE:
+				time_in_flight += 1;
+				if (motion_detection_count == 0) {
+					// disc has stopped moving; stop timer
+					gecko_cmd_hardware_set_soft_timer(0, MOTION_TIMEOUT_HANDLE, false);
+					// TODO:  process time in flight (send indication)
+					if (connection) {
+						uint8_t time_in_flight_halfSecond = time_in_flight;
+						gecko_cmd_gatt_server_send_characteristic_notification(connection,
+								gattdb_time_of_flight, sizeof(time_in_flight_halfSecond), (const uint8_t *)(&time_in_flight_halfSecond));
+					}
+					time_in_flight = 0;
+					motion_timer_started = false;
+					// disable gyroscope to save power
+					imu_enable_gyro(false);
+				} else {
+					imu_read_gyro_start();
 				}
-		        break;
+				motion_detection_count = 0;
+			}
+		    break;
 
 		/* Check if the user-type OTA Control Characteristic was written.
 		 * If ota_control was written, boot the device into Device Firmware Upgrade (DFU) mode. */
@@ -376,6 +431,8 @@ int main(void) {
 					GPIO_PinOutSet(LED_BW_port, LED_BW_pin);
 					gecko_cmd_hardware_set_soft_timer(LED_ON_TIME_LFO, LED_BLINK_RATE_HANDLE, true);
 					gecko_cmd_hardware_set_soft_timer((ps_data.s.led_intensity * LFO_HZ), LED_TIMEOUT_HANDLE, true);
+					graphics_println("Begin LED");
+					graphics_println("flashing...");
 				}
 			}
 			break;
@@ -406,6 +463,7 @@ int main(void) {
 			break;
 
 		case gecko_evt_system_external_signal_id:
+/*
 			if (event_flag & START_TEMPERATURE_POR) {
 				event_flag &= ~START_TEMPERATURE_POR;
 				i2c_sensor_por();
@@ -450,6 +508,69 @@ int main(void) {
 				i2c_load_stop_cmd();
 				letimer_update_compare1();
 			}
+*/
+			if (check_ef(&event_flag, LOAD_IMU_START_WRITE)) {
+				imu_init_sched();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_CONFIG_ADDR | ACK_RECEIVED)) {
+				imu_config_addr();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_CONFIG_DATA | ACK_RECEIVED)) {
+				imu_config_data();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_CONFIG_NEXT | ACK_RECEIVED)) {
+				imu_config_next();
+			}
+			if (check_ef(&event_flag, IMU_MOTION_INTERRUPT)) {
+				graphics_println("Motion");
+				graphics_println("Detected!");
+				if (connection) { // no need to read gyro data if there's no active BLE connection
+					if (!motion_timer_started) {
+						if (imu_enable_gyro(true) == GYRO_EN_SUCCESS) {
+							motion_timer_started = true;
+							imu_clear_avg(); // starting a new motion capture
+							gecko_cmd_hardware_set_soft_timer(MOTION_TIMEOUT_INTERVAL, MOTION_TIMEOUT_HANDLE, false);
+						}
+					}
+					motion_detection_count++;
+				}
+			}
+			if (check_ef(&event_flag, LOAD_IMU_EN_GYRO_ADDR | ACK_RECEIVED)) {
+				imu_en_gyro_addr();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_EN_GYRO_DATA | ACK_RECEIVED)) {
+				imu_en_gyro_data();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_EN_GYRO_DONE | ACK_RECEIVED)) {
+				imu_en_gyro_done();
+			}
+			// read gyroscope event handling
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_ADDR | ACK_RECEIVED)) {
+				imu_read_gyro_addr();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DATA | ACK_RECEIVED)) {
+				imu_read_gyro_data();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | ACK_RECEIVED)) {
+				imu_read_gyro_cont();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | DATA_RECEIVED)) {
+				imu_read_gyro_drdy();
+			}
+			// process the gyro data
+			if (check_ef(&event_flag, GYRO_PROCESS_DATA)) {
+				imu_update_avg();
+				const uint8_t * gyro_rt = (const uint8_t *)(imu_get_gyro_data_rt_int());
+				const uint8_t * gyro_avg = (const uint8_t *)(imu_get_gyro_data_avg_int());
+				// TODO:  send indication of real-time and average z-axis data
+				if (connection) {
+					gecko_cmd_gatt_server_send_characteristic_notification(connection,
+							gattdb_angular_vel_rt, NUM_OF_GYRO_REGISTERS, gyro_rt);
+					gecko_cmd_gatt_server_send_characteristic_notification(connection,
+							gattdb_angular_vel_avg, NUM_OF_GYRO_REGISTERS, gyro_avg);
+				}
+			}
+
 			break;
 
 		default:
@@ -457,6 +578,7 @@ int main(void) {
 		}
 	}
 }
+
 
 /** @} (end addtogroup app) */
 /** @} (end addtogroup Application) */

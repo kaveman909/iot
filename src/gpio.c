@@ -2,6 +2,9 @@
 // Include files
 //***********************************************************************************
 #include "gpio.h"
+#include "gpiointerrupt.h"
+#include "event.h"
+#include "native_gecko.h"
 
 //***********************************************************************************
 // defined files
@@ -21,6 +24,14 @@
 //***********************************************************************************
 // functions
 //***********************************************************************************
+
+void gpio_interrupt_callback(uint8_t pin) {
+	if (pin == IMU_INT_pin) {
+		event_flag |= IMU_MOTION_INTERRUPT;
+		gecko_external_signal(event_flag);
+	}
+}
+
 void gpio_init(void){
 
 	// Set LED ports to be standard output drive with default off (cleared)
@@ -34,4 +45,12 @@ void gpio_init(void){
 
 	GPIO_DriveStrengthSet(LED_BW_port, gpioDriveStrengthStrongAlternateStrong);
 	GPIO_PinModeSet(LED_BW_port, LED_BW_pin, gpioModePushPull, LED_BW_default);
+
+	GPIO_PinModeSet(IMU_INT_port, IMU_INT_pin, gpioModeInputPullFilter, 1);
+	GPIO_ExtIntConfig(IMU_INT_port, IMU_INT_pin, IMU_INT_pin, true, false, true);
+
+	GPIOINT_Init();
+	GPIOINT_CallbackRegister(IMU_INT_pin, gpio_interrupt_callback);
 }
+
+

@@ -25,8 +25,6 @@
 
 #define I2C_SLAVE_ADDR 0x40 // address of Si7021
 #define CMD_MEAS_TEMP_NO_HOLD 0xF3
-#define WRITE_BIT 0
-#define READ_BIT 1
 
 static I2C_Init_TypeDef i2c_init = I2C_INIT_DEFAULT;
 static uint16_t data_lsb;
@@ -35,6 +33,8 @@ static volatile uint16_t i2c_rxdata;
 /* Temperature data */
 #define TEMPERATURE_LIMIT_DEG_C 15.0f
 static volatile float temperature_degC;
+
+static bool i2c_locked = false;
 
 static inline float raw_data_to_temp_degC(uint16_t raw_data) {
 	float temp_degC = 175.72f * (float)raw_data;
@@ -58,8 +58,13 @@ void i2c_setup(void) {
 
 }
 
+bool i2c_get_lock(void) {
+	return i2c_locked;
+}
 
 void i2c_open(void) {
+	/* Set flag indicating i2c is locked */
+	i2c_locked = true;
 	/* Setup SCL and SDA to be open-drain outputs, initialized to high */
 	GPIO_PinModeSet(I2C0_SCL_Port, I2C0_SCL_Pin, gpioModeWiredAnd, true);
 	GPIO_PinModeSet(I2C0_SDA_Port, I2C0_SDA_Pin, gpioModeWiredAnd, true);
@@ -102,6 +107,7 @@ void i2c_close(void) {
 	// on the enable pins.
 	GPIO_PinModeSet(SENSOR_ENABLE_Port, SENSOR_ENABLE_Pin, gpioModeDisabled, false);
 	SLEEP_SleepBlockEnd(EM_I2C0 + 1);
+	i2c_locked = false;
 }
 
 void i2c_sensor_por(void) {
@@ -164,6 +170,10 @@ void i2c_finish_measurement(void) {
 	I2C0->TXDATA = (I2C_SLAVE_ADDR << 1) | READ_BIT;
 	event_flag |= WAIT_FOR_MEASUREMENT;
 	gecko_external_signal(event_flag);
+}
+
+uint16_t i2c_get_rxdata(void) {
+	return i2c_rxdata;
 }
 
 void I2C0_IRQHandler(void) {
