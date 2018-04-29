@@ -375,6 +375,11 @@ int main(void) {
 
 					time_in_flight = 0;
 					motion_timer_started = false;
+					// disable gyroscope to save power
+					imu_enable_gyro(false);
+				} else {
+					// TODO:  initiate reading of gyroscope
+					imu_read_gyro_start();
 				}
 				motion_detection_count = 0;
 			}
@@ -514,11 +519,36 @@ int main(void) {
 				graphics_println("Motion");
 				graphics_println("Detected!");
 				if (!motion_timer_started) {
-					motion_timer_started = true;
-					gecko_cmd_hardware_set_soft_timer(MOTION_TIMEOUT_INTERVAL, MOTION_TIMEOUT_HANDLE, false);
+					if (imu_enable_gyro(true) == GYRO_EN_SUCCESS) {
+						motion_timer_started = true;
+						gecko_cmd_hardware_set_soft_timer(MOTION_TIMEOUT_INTERVAL, MOTION_TIMEOUT_HANDLE, false);
+					}
 				}
 				motion_detection_count++;
 			}
+			if (check_ef(&event_flag, LOAD_IMU_EN_GYRO_ADDR | ACK_RECEIVED)) {
+				imu_en_gyro_addr();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_EN_GYRO_DATA | ACK_RECEIVED)) {
+				imu_en_gyro_data();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_EN_GYRO_DONE | ACK_RECEIVED)) {
+				imu_en_gyro_done();
+			}
+			// read gyroscope event handling
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_ADDR | ACK_RECEIVED)) {
+				imu_read_gyro_addr();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DATA | ACK_RECEIVED)) {
+				imu_read_gyro_data();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | ACK_RECEIVED)) {
+				imu_read_gyro_cont();
+			}
+			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | DATA_RECEIVED)) {
+				imu_read_gyro_drdy();
+			}
+
 			break;
 
 		default:

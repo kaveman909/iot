@@ -17,6 +17,7 @@
 void i2c_start_measurement(void);
 void i2c_finish_measurement(void);
 void i2c_setup(void);
+bool i2c_get_lock(void);
 void i2c_open(void);
 void i2c_close(void);
 void i2c_sensor_por(void);
@@ -24,6 +25,7 @@ void i2c_load_measure_cmd(void);
 void i2c_load_stop_cmd(void);
 void i2c_handle_first_byte(void);
 void i2c_handle_second_byte(void);
-int32_t i2c_get_temperature_deg_mC(void) ;
+int32_t i2c_get_temperature_deg_mC(void);
+uint16_t i2c_get_rxdata(void);
 
 #endif /* I2C_H_ */

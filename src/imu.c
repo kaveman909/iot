@@ -32,6 +32,10 @@ static uint32_t imu_config_addr_vector[2][NUM_OF_CONFIG_CMDS] = {{
 	IMU_PWR_MGMT_1_CONFIG2
 }};
 
+static uint8_t gyro_result_buffer[NUM_OF_GYRO_REGISTERS];
+static uint8_t gyro_result_index = 0;
+static bool gyro_enable = false;
+
 void imu_init(void) {
 	event_flag |= LOAD_IMU_START_WRITE;
 	gecko_external_signal(event_flag);
@@ -40,6 +44,139 @@ void imu_init(void) {
 void imu_init_sched(void) {
 	i2c_open();
 	imu_start_write();
+}
+
+static void imu_enable_gyro_start_write(void) {
+	// load slave address (writing)
+	I2C0->TXDATA = (IMU_I2C_ADDRESS << 1) | WRITE_BIT;
+	// start command
+	I2C0->CMD = I2C_CMD_START;
+	// wait for ack
+	event_flag |= LOAD_IMU_EN_GYRO_ADDR;
+	gecko_external_signal(event_flag);
+}
+
+int8_t imu_enable_gyro(bool enable) {
+	if (i2c_get_lock() == false) {
+		gyro_enable = enable;
+		i2c_open();
+		imu_enable_gyro_start_write();
+		return GYRO_EN_SUCCESS;
+	} else {
+		return GYRO_EN_FAILURE;
+	}
+}
+
+static bool gyro_enable_part2 = false;
+void imu_en_gyro_addr(void) {
+	// load the address we are configuring
+	if (gyro_enable_part2) {
+		I2C0->TXDATA = IMU_PWR_MGMT_1;
+	} else {
+		I2C0->TXDATA = IMU_PWR_MGMT_2;
+	}
+	// wait for ack
+	event_flag |= LOAD_IMU_EN_GYRO_DATA;
+	gecko_external_signal(event_flag);
+}
+
+void imu_en_gyro_data(void) {
+	// load the data we are configuring
+	if (gyro_enable) {
+		if (gyro_enable_part2) {
+			I2C0->TXDATA = IMU_PWR_MGMT_1_CONFIG;
+		} else {
+			I2C0->TXDATA = IMU_PWR_MGMT_2_EN_GYRO;
+		}
+	} else {
+		if (gyro_enable_part2) {
+			I2C0->TXDATA = IMU_PWR_MGMT_1_CONFIG2;
+		} else {
+			I2C0->TXDATA = IMU_PWR_MGMT_2_CONFIG;
+		}
+	}
+	// wait for ack
+	event_flag |= LOAD_IMU_EN_GYRO_DONE;
+	gecko_external_signal(event_flag);
+}
+
+void imu_en_gyro_done(void) {
+	// stop the current configuration
+	I2C0->CMD = I2C_CMD_STOP;
+	while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
+	if (!gyro_enable_part2) {
+		gyro_enable_part2 = true;
+		imu_enable_gyro_start_write();
+	} else {
+		gyro_enable_part2 = false;
+		i2c_close();
+	}
+}
+
+int8_t imu_read_gyro_start(void) {
+	if (i2c_get_lock() == false) {
+		i2c_open();
+		// load slave address (writing)
+		I2C0->TXDATA = (IMU_I2C_ADDRESS << 1) | WRITE_BIT;
+		// start command
+		I2C0->CMD = I2C_CMD_START;
+		// wait for ack
+		event_flag |= LOAD_IMU_READ_GYRO_ADDR;
+		gecko_external_signal(event_flag);
+		return GYRO_READ_SUCCESS;
+	} else {
+		return GYRO_READ_FAILURE;
+	}
+}
+
+void imu_read_gyro_addr(void) {
+	// load the address we are going to read
+	I2C0->TXDATA = GYRO_XOUT_H; // first gyro result address for burst read
+	// wait for ack
+	event_flag |= LOAD_IMU_READ_GYRO_DATA;
+	gecko_external_signal(event_flag);
+}
+
+void imu_read_gyro_data(void) {
+	// send repeated start command
+	I2C0->CMD = I2C_CMD_START;
+	// load slave address (reading)
+	I2C0->TXDATA = (IMU_I2C_ADDRESS << 1) | READ_BIT;
+	// wait for ack and data
+	event_flag |= LOAD_IMU_READ_GYRO_DRDY;
+	gecko_external_signal(event_flag);
+}
+
+volatile uint16_t i2c_dummy_read;
+void imu_read_gyro_cont(void) {
+	// clear the RXDATA buffer?
+	i2c_dummy_read = I2C0->RXDATA;
+	// wait for data
+	event_flag |= LOAD_IMU_READ_GYRO_DRDY;
+	gecko_external_signal(event_flag);
+}
+
+void imu_read_gyro_drdy(void) {
+	gyro_result_buffer[gyro_result_index] = i2c_get_rxdata();
+	gyro_result_index++;
+	if (gyro_result_index < NUM_OF_GYRO_REGISTERS) {
+		// get next byte
+		// send an ack to slave
+		I2C0->CMD = I2C_CMD_ACK;
+		while((I2C0->STATUS & I2C_STATUS_PACK) == I2C_STATUS_PACK);
+		// wait for data
+		event_flag |= LOAD_IMU_READ_GYRO_DRDY;
+		gecko_external_signal(event_flag);
+	} else {
+		gyro_result_index = 0;
+		// received all the gyro data; send NACK then STOP condition
+		I2C0->CMD = I2C_CMD_NACK;
+		while((I2C0->STATUS & I2C_STATUS_PNACK) == I2C_STATUS_PNACK);
+		I2C0->CMD = I2C_CMD_STOP;
+		while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
+		// we are done with i2c for now, release peripheral
+		i2c_close();
+	}
 }
 
 void imu_start_write(void) {
