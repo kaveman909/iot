@@ -93,6 +93,8 @@ uint8_t boot_to_dfu = 0;
 #define LED_PERIOD_STEP_MS    100
 //#define LED_TIMEOUT_SEC       30
 
+#define MAX_TX_POWER_dBm      8 // +8dBm max from datasheet
+
 #define LED_ON_TIME_NS        (LED_ON_TIME_MS * 1000000UL)
 #define LED_PERIOD_STEP_NS    (LED_PERIOD_STEP_MS * 1000000UL)
 #define LFO_HZ                32768
@@ -251,9 +253,11 @@ int main(void) {
 	while (1) {
 		/* Event pointer for handling events */
 		struct gecko_cmd_packet* evt;
+#if 0
 		int16_t tx_level;
 		static int16_t tx_level_hist = 0;
 		int8_t rssi;
+#endif
 		char passkey_str[30];
 		/* Check for stack event. */
 		evt = gecko_wait_event();
@@ -324,8 +328,9 @@ int main(void) {
 				graphics_println("Connected!");
 				gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			}
-			gecko_cmd_le_connection_get_rssi(connection);
-			gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
+			gecko_cmd_system_set_tx_power(MAX_TX_POWER_dBm * 10);
+			//gecko_cmd_le_connection_get_rssi(connection);
+			//gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
 			break;
 
 		case gecko_evt_le_connection_closed_id:
@@ -352,7 +357,7 @@ int main(void) {
 			switch (evt->data.evt_hardware_soft_timer.handle){
 			case 0:
 				    if (connection) {
-				    	gecko_cmd_le_connection_get_rssi(connection);
+				    	//gecko_cmd_le_connection_get_rssi(connection);
 				    }
 					break;
 			case LED_BLINK_RATE_HANDLE:
@@ -374,7 +379,6 @@ int main(void) {
 				if (motion_detection_count == 0) {
 					// disc has stopped moving; stop timer
 					gecko_cmd_hardware_set_soft_timer(0, MOTION_TIMEOUT_HANDLE, false);
-					// TODO:  process time in flight (send indication)
 					if (connection) {
 						uint8_t time_in_flight_halfSecond = time_in_flight;
 						gecko_cmd_gatt_server_send_characteristic_notification(connection,
@@ -437,6 +441,7 @@ int main(void) {
 			}
 			break;
 
+#if 0
 		case gecko_evt_le_connection_rssi_id:
 			rssi = evt->data.evt_le_connection_rssi.rssi;
 			if (rssi > -35) {
@@ -461,9 +466,9 @@ int main(void) {
 			}
 			tx_level_hist = tx_level;
 			break;
-
+#endif
 		case gecko_evt_system_external_signal_id:
-/*
+#if 0
 			if (event_flag & START_TEMPERATURE_POR) {
 				event_flag &= ~START_TEMPERATURE_POR;
 				i2c_sensor_por();
@@ -508,7 +513,7 @@ int main(void) {
 				i2c_load_stop_cmd();
 				letimer_update_compare1();
 			}
-*/
+#endif
 			if (check_ef(&event_flag, LOAD_IMU_START_WRITE)) {
 				imu_init_sched();
 			}
@@ -551,9 +556,6 @@ int main(void) {
 			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DATA | ACK_RECEIVED)) {
 				imu_read_gyro_data();
 			}
-			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | ACK_RECEIVED)) {
-				imu_read_gyro_cont();
-			}
 			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | DATA_RECEIVED)) {
 				imu_read_gyro_drdy();
 			}
@@ -562,7 +564,6 @@ int main(void) {
 				imu_update_avg();
 				const uint8_t * gyro_rt = (const uint8_t *)(imu_get_gyro_data_rt_int());
 				const uint8_t * gyro_avg = (const uint8_t *)(imu_get_gyro_data_avg_int());
-				// TODO:  send indication of real-time and average z-axis data
 				if (connection) {
 					gecko_cmd_gatt_server_send_characteristic_notification(connection,
 							gattdb_angular_vel_rt, NUM_OF_GYRO_REGISTERS, gyro_rt);

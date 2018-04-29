@@ -152,15 +152,6 @@ void imu_read_gyro_data(void) {
 	gecko_external_signal(event_flag);
 }
 
-volatile uint16_t i2c_dummy_read;
-void imu_read_gyro_cont(void) {
-	// clear the RXDATA buffer?
-	i2c_dummy_read = I2C0->RXDATA;
-	// wait for data
-	event_flag |= LOAD_IMU_READ_GYRO_DRDY;
-	gecko_external_signal(event_flag);
-}
-
 void imu_read_gyro_drdy(void) {
 	if (gyro_result_index & 1) {
 		// odd

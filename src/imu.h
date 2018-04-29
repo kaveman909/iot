@@ -129,7 +129,6 @@ void imu_en_gyro_done(void);
 int8_t imu_read_gyro_start(void);
 void imu_read_gyro_addr(void);
 void imu_read_gyro_data(void);
-void imu_read_gyro_cont(void);
 void imu_read_gyro_drdy(void);
 
 //void imu_calculate_degPerSec(void);
