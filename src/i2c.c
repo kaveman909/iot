@@ -176,7 +176,6 @@ uint16_t i2c_get_rxdata(void) {
 	return i2c_rxdata;
 }
 
-
 void I2C0_IRQHandler(void) {
 	uint32_t flags = I2C_IntGet(I2C0);
 	I2C_IntClear(I2C0, flags);

@@ -9,7 +9,12 @@
 #define IMU_H_
 
 // Configuration parameters
-#define IMU_MOTION_THRESHOLD_MG    40
+/*
+ * This register holds the threshold value for the Wake on Motion Interrupt for
+ * accel x/y/z axes. LSB = 4mg. Range is 0mg to 1020mg.
+ *
+ */
+#define IMU_MOTION_THRESHOLD_MG    200
 /*
 Lposc_clksel Output Frequency (Hz)
 0 0.24
@@ -28,13 +33,24 @@ Lposc_clksel Output Frequency (Hz)
 */
 #define IMU_MOTION_UPDATE_RATE_HZ 5
 
+/*
+ * Gyro Full Scale Select [4:3]:
+ * 00 = +250dps
+ * 01= +500 dps
+ * 10 = +1000 dps
+ * 11 = +2000 dps
+ */
+#define IMU_GYRO_FS_SEL        3 // +2000 dps
+#define IMU_GYRO_CONFIG_CONFIG (IMU_GYRO_FS_SEL << 3)
+
 // I2C Address
 #define IMU_I2C_ADDRESS 0x68 // default
 
-#define NUM_OF_CONFIG_CMDS    8
+#define NUM_OF_CONFIG_CMDS    9
 #define NUM_OF_GYRO_REGISTERS 6
 
 // Registers
+#define IMU_GYRO_CONFIG     0x1b
 #define IMU_PWR_MGMT_1      0x6b
 #define IMU_PWR_MGMT_2      0x6c
 #define IMU_ACCEL_CONFIG_2  0x1d
@@ -60,6 +76,12 @@ enum gyro_en_success_e {
 enum gyro_read_success_e {
 	GYRO_READ_FAILURE = -1,
 	GYRO_READ_SUCCESS
+};
+
+enum g_axes_e {
+	GX_AXIS = 0,
+	GY_AXIS,
+	GZ_AXIS
 };
 
 /* Wake-on-motion configuration using low-power accel mode.
@@ -109,3 +131,11 @@ void imu_read_gyro_addr(void);
 void imu_read_gyro_data(void);
 void imu_read_gyro_cont(void);
 void imu_read_gyro_drdy(void);
+
+//void imu_calculate_degPerSec(void);
+void imu_update_avg(void);
+void imu_clear_avg(void);
+float imu_get_gyro_data_avg(uint8_t axis);
+float imu_get_gyro_data_rt(uint8_t axis);
+int16_t * imu_get_gyro_data_avg_int(void);
+int16_t * imu_get_gyro_data_rt_int(void);

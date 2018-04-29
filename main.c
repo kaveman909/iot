@@ -342,6 +342,7 @@ int main(void) {
 			}
 			gecko_cmd_hardware_set_soft_timer(0, 0, 0);
 			graphics_println("Disconnected");
+			connection = 0;  // indicates no longer connected
 			break;
 
 			/* Events related to OTA upgrading
@@ -350,7 +351,9 @@ int main(void) {
 		case gecko_evt_hardware_soft_timer_id:
 			switch (evt->data.evt_hardware_soft_timer.handle){
 			case 0:
-					gecko_cmd_le_connection_get_rssi(connection);
+				    if (connection) {
+				    	gecko_cmd_le_connection_get_rssi(connection);
+				    }
 					break;
 			case LED_BLINK_RATE_HANDLE:
 					if(GPIO_PinOutGet(LED_BW_port, LED_BW_pin)) {
@@ -367,18 +370,21 @@ int main(void) {
 					graphics_println("Stop LED");
 					break;
 			case MOTION_TIMEOUT_HANDLE:
-				time_in_flight += MOTION_TIMEOUT_INTERVAL_MS;
+				time_in_flight += 1;
 				if (motion_detection_count == 0) {
 					// disc has stopped moving; stop timer
 					gecko_cmd_hardware_set_soft_timer(0, MOTION_TIMEOUT_HANDLE, false);
 					// TODO:  process time in flight (send indication)
-
+					if (connection) {
+						uint8_t time_in_flight_halfSecond = time_in_flight;
+						gecko_cmd_gatt_server_send_characteristic_notification(connection,
+								gattdb_time_of_flight, sizeof(time_in_flight_halfSecond), (const uint8_t *)(&time_in_flight_halfSecond));
+					}
 					time_in_flight = 0;
 					motion_timer_started = false;
 					// disable gyroscope to save power
 					imu_enable_gyro(false);
 				} else {
-					// TODO:  initiate reading of gyroscope
 					imu_read_gyro_start();
 				}
 				motion_detection_count = 0;
@@ -518,13 +524,16 @@ int main(void) {
 			if (check_ef(&event_flag, IMU_MOTION_INTERRUPT)) {
 				graphics_println("Motion");
 				graphics_println("Detected!");
-				if (!motion_timer_started) {
-					if (imu_enable_gyro(true) == GYRO_EN_SUCCESS) {
-						motion_timer_started = true;
-						gecko_cmd_hardware_set_soft_timer(MOTION_TIMEOUT_INTERVAL, MOTION_TIMEOUT_HANDLE, false);
+				if (connection) { // no need to read gyro data if there's no active BLE connection
+					if (!motion_timer_started) {
+						if (imu_enable_gyro(true) == GYRO_EN_SUCCESS) {
+							motion_timer_started = true;
+							imu_clear_avg(); // starting a new motion capture
+							gecko_cmd_hardware_set_soft_timer(MOTION_TIMEOUT_INTERVAL, MOTION_TIMEOUT_HANDLE, false);
+						}
 					}
+					motion_detection_count++;
 				}
-				motion_detection_count++;
 			}
 			if (check_ef(&event_flag, LOAD_IMU_EN_GYRO_ADDR | ACK_RECEIVED)) {
 				imu_en_gyro_addr();
@@ -547,6 +556,19 @@ int main(void) {
 			}
 			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | DATA_RECEIVED)) {
 				imu_read_gyro_drdy();
+			}
+			// process the gyro data
+			if (check_ef(&event_flag, GYRO_PROCESS_DATA)) {
+				imu_update_avg();
+				const uint8_t * gyro_rt = (const uint8_t *)(imu_get_gyro_data_rt_int());
+				const uint8_t * gyro_avg = (const uint8_t *)(imu_get_gyro_data_avg_int());
+				// TODO:  send indication of real-time and average z-axis data
+				if (connection) {
+					gecko_cmd_gatt_server_send_characteristic_notification(connection,
+							gattdb_angular_vel_rt, NUM_OF_GYRO_REGISTERS, gyro_rt);
+					gecko_cmd_gatt_server_send_characteristic_notification(connection,
+							gattdb_angular_vel_avg, NUM_OF_GYRO_REGISTERS, gyro_avg);
+				}
 			}
 
 			break;

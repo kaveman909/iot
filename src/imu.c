@@ -10,8 +10,12 @@
 #include "event.h"
 #include "native_gecko.h"
 
+// globals
+const uint16_t gyro_full_scale[4] = {250, 500, 1000, 2000};
+
 static uint32_t imu_config_index = 0;
 static uint32_t imu_config_addr_vector[2][NUM_OF_CONFIG_CMDS] = {{
+	IMU_GYRO_CONFIG,
 	IMU_PWR_MGMT_1,
 	IMU_PWR_MGMT_2,
 	IMU_ACCEL_CONFIG_2,
@@ -22,6 +26,7 @@ static uint32_t imu_config_addr_vector[2][NUM_OF_CONFIG_CMDS] = {{
 	IMU_PWR_MGMT_1
 },
 {
+	IMU_GYRO_CONFIG_CONFIG,
 	IMU_PWR_MGMT_1_CONFIG,
 	IMU_PWR_MGMT_2_CONFIG,
 	IMU_ACCEL_CONFIG_2_CONFIG,
@@ -32,7 +37,7 @@ static uint32_t imu_config_addr_vector[2][NUM_OF_CONFIG_CMDS] = {{
 	IMU_PWR_MGMT_1_CONFIG2
 }};
 
-static uint8_t gyro_result_buffer[NUM_OF_GYRO_REGISTERS];
+static int16_t gyro_result_buffer[NUM_OF_GYRO_REGISTERS/2];
 static uint8_t gyro_result_index = 0;
 static bool gyro_enable = false;
 
@@ -157,7 +162,13 @@ void imu_read_gyro_cont(void) {
 }
 
 void imu_read_gyro_drdy(void) {
-	gyro_result_buffer[gyro_result_index] = i2c_get_rxdata();
+	if (gyro_result_index & 1) {
+		// odd
+		((uint8_t *)(gyro_result_buffer))[gyro_result_index - 1] = i2c_get_rxdata();
+	} else {
+		// even
+		((uint8_t *)(gyro_result_buffer))[gyro_result_index + 1] = i2c_get_rxdata();
+	}
 	gyro_result_index++;
 	if (gyro_result_index < NUM_OF_GYRO_REGISTERS) {
 		// get next byte
@@ -176,7 +187,65 @@ void imu_read_gyro_drdy(void) {
 		while((I2C0->STATUS & I2C_STATUS_PSTOP) == I2C_STATUS_PSTOP);
 		// we are done with i2c for now, release peripheral
 		i2c_close();
+
+		// alert main event handler we are ready to process gyro data
+		event_flag |= GYRO_PROCESS_DATA;
+		gecko_external_signal(event_flag);
 	}
+}
+
+/*
+void imu_calculate_degPerSec(void) {
+	for (int i = 0; i < (NUM_OF_GYRO_REGISTERS/2); i++) {
+		gyro_degPerSec[i] = ((float)(gyro_result_buffer[i]) * (float)(gyro_full_scale[IMU_GYRO_FS_SEL]))/32768.0;
+	}
+}
+*/
+
+static float gyro_degPerSec[NUM_OF_GYRO_REGISTERS/2] = {0, 0, 0};
+static float gyro_accum_degPerSec[NUM_OF_GYRO_REGISTERS/2] = {0, 0, 0};
+static float gyro_avg_degPerSec[NUM_OF_GYRO_REGISTERS/2] = {0, 0, 0};
+
+static int16_t gyro_degPerSec_i[NUM_OF_GYRO_REGISTERS/2] = {0, 0, 0};
+static int16_t gyro_avg_degPerSec_i[NUM_OF_GYRO_REGISTERS/2] = {0, 0, 0};
+
+static float gyro_avg_samples = 0;
+
+void imu_update_avg(void) {
+	gyro_avg_samples++;
+	for (int i = 0; i < (NUM_OF_GYRO_REGISTERS/2); i++) {
+		gyro_degPerSec[i] = ((float)(gyro_result_buffer[i]) * (float)(gyro_full_scale[IMU_GYRO_FS_SEL]))/32768.0;
+		gyro_accum_degPerSec[i] += gyro_degPerSec[i];
+		gyro_avg_degPerSec[i] = gyro_accum_degPerSec[i] / gyro_avg_samples;
+		// update int versions
+		gyro_degPerSec_i[i] = (int16_t)(gyro_degPerSec[i]);
+		gyro_avg_degPerSec_i[i] = (int16_t)(gyro_avg_degPerSec[i]);
+	}
+}
+
+void imu_clear_avg(void) {
+	gyro_avg_samples = 0;
+	for (int i = 0; i < (NUM_OF_GYRO_REGISTERS/2); i++) {
+		gyro_degPerSec[i] = 0;
+		gyro_accum_degPerSec[i] = 0;
+		gyro_avg_degPerSec[i] = 0;
+	}
+}
+
+float imu_get_gyro_data_avg(uint8_t axis) {
+	return gyro_avg_degPerSec[axis];
+}
+
+float imu_get_gyro_data_rt(uint8_t axis) {
+	return gyro_degPerSec[axis];
+}
+
+int16_t * imu_get_gyro_data_rt_int(void) {
+	return gyro_degPerSec_i;
+}
+
+int16_t * imu_get_gyro_data_avg_int(void) {
+	return gyro_avg_degPerSec_i;
 }
 
 void imu_start_write(void) {
@@ -218,3 +287,4 @@ void imu_config_next(void) {
 		i2c_close();
 	}
 }
+
