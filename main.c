@@ -82,6 +82,7 @@ uint8_t boot_to_dfu = 0;
 #include "ps_keys.h"
 #include "graphics.h"
 #include "imu.h"
+#include "speaker.h"
 #include <stdio.h>
 
 //***********************************************************************************
@@ -220,6 +221,11 @@ static bool check_ef(uint32_t * ef, uint32_t events) {
 	return ret;
 }
 
+static void update_speaker_from_ps(ps_data_t * ps_d) {
+  speaker_set_freq((uint16_t)(ps_d->s.speaker_pitch) * 100);
+  speaker_set_duty((float)(ps_d->s.speaker_volume) / 100.0f);
+}
+
 //***********************************************************************************
 // main
 //***********************************************************************************
@@ -245,6 +251,7 @@ int main(void) {
 	// Initialize LETIMER
 	letimer_clock_init();
 	//letimer_init();
+	LETIMER_setup();
 	i2c_setup();
 	imu_init();
 	graphics_init();
@@ -296,6 +303,9 @@ int main(void) {
 			/* Initialize PS data */
 
 			ps_keys_init(sizeof(gattdb_ps_data), gattdb_ps_data, gattdb_ps_default_data, &ps_data);
+
+			/* set speaker parameters based on read PS data */
+			update_speaker_from_ps(&ps_data);
 			break;
 
 		case gecko_evt_sm_passkey_display_id:
@@ -328,13 +338,14 @@ int main(void) {
 				graphics_println("Connected!");
 				gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			}
+			// want to use max power for this application (will be far from device)
 			gecko_cmd_system_set_tx_power(MAX_TX_POWER_dBm * 10);
 			//gecko_cmd_le_connection_get_rssi(connection);
 			//gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
 			break;
 
 		case gecko_evt_le_connection_closed_id:
-			/* Reset output power to 0 dBm */
+			/* Reset output power to 0 dBm for advertisements*/
 			gecko_cmd_system_set_tx_power(0);
 			/* Check if need to boot to dfu mode */
 			if (boot_to_dfu) {
@@ -371,6 +382,7 @@ int main(void) {
 					break;
 			case LED_TIMEOUT_HANDLE:
 					GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
+					speaker_enable(false);
 					gecko_cmd_hardware_set_soft_timer(0, LED_BLINK_RATE_HANDLE, true);
 					graphics_println("Stop LED");
 					break;
@@ -383,6 +395,7 @@ int main(void) {
 						uint8_t time_in_flight_halfSecond = time_in_flight;
 						gecko_cmd_gatt_server_send_characteristic_notification(connection,
 								gattdb_time_of_flight, sizeof(time_in_flight_halfSecond), (const uint8_t *)(&time_in_flight_halfSecond));
+						gecko_cmd_gatt_server_write_attribute_value(gattdb_time_of_flight, 0, sizeof(time_in_flight_halfSecond), (const uint8_t *)(&time_in_flight_halfSecond));
 					}
 					time_in_flight = 0;
 					motion_timer_started = false;
@@ -438,6 +451,18 @@ int main(void) {
 					graphics_println("Begin LED");
 					graphics_println("flashing...");
 				}
+			}
+			if (evt->data.evt_gatt_server_attribute_value.attribute == gattdb_speaker_on_off) {
+			  struct gecko_msg_gatt_server_read_attribute_value_rsp_t * temp =
+			      gecko_cmd_gatt_server_read_attribute_value(gattdb_speaker_on_off, 0);
+			  if (temp->value.data[0] == 1) {
+			    // Make sure speaker pitch / volume is up-to-date
+			    update_speaker_from_ps(&ps_data);
+			    // Enable Speaker Output
+			    speaker_enable(true);
+			    gecko_cmd_hardware_set_soft_timer((ps_data.s.led_intensity * LFO_HZ), LED_TIMEOUT_HANDLE, true);
+			    graphics_println("Begin speaker!");
+			  }
 			}
 			break;
 
@@ -569,6 +594,10 @@ int main(void) {
 							gattdb_angular_vel_rt, NUM_OF_GYRO_REGISTERS, gyro_rt);
 					gecko_cmd_gatt_server_send_characteristic_notification(connection,
 							gattdb_angular_vel_avg, NUM_OF_GYRO_REGISTERS, gyro_avg);
+					gecko_cmd_gatt_server_write_attribute_value(gattdb_angular_vel_rt, 0,
+					    NUM_OF_GYRO_REGISTERS, gyro_rt);
+					gecko_cmd_gatt_server_write_attribute_value(gattdb_angular_vel_avg, 0,
+					    NUM_OF_GYRO_REGISTERS, gyro_avg);
 				}
 			}
 

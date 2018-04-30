@@ -27,6 +27,17 @@
 // (On WSTK:  P6)
 #define IMU_INT_port     gpioPortD
 #define IMU_INT_pin      11
+// Speaker PWM pin is
+// (On WSTK:  P2)
+#define SPEAKER_port     gpioPortA
+#define SPEAKER_pin      3
+#define SPEAKER_loc      3 // LETIM0_OUT0 location #3
+
+// Speaker Enable pin is
+// (On WSTK:  P8)
+#define SPEAKER_EN_port    gpioPortD
+#define SPEAKER_EN_pin     12
+#define SPEAKER_EN_default false
 
 //***********************************************************************************
 // global variables

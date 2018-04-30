@@ -18,9 +18,9 @@
 #define ps_key_led_intesity      (gattdb_led_intensity + ps_key_base)
 
 // Speaker Control
-#define default_speaker_pitch    70
+#define default_speaker_pitch    20 // 0.1 kHz
 #define ps_key_speaker_pitch     (gattdb_speaker_pitch + ps_key_base)
-#define default_speaker_volume   80
+#define default_speaker_volume   50 // % duty cycle
 #define ps_key_speaker_volume    (gattdb_speaker_volume + ps_key_base)
 
 #endif /* PS_KEYS_H_ */

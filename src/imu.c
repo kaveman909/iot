@@ -205,7 +205,7 @@ static float gyro_avg_samples = 0;
 void imu_update_avg(void) {
 	gyro_avg_samples++;
 	for (int i = 0; i < (NUM_OF_GYRO_REGISTERS/2); i++) {
-		gyro_degPerSec[i] = ((float)(gyro_result_buffer[i]) * (float)(gyro_full_scale[IMU_GYRO_FS_SEL]))/32768.0;
+		gyro_degPerSec[i] = ((float)(gyro_result_buffer[i]) * (float)(gyro_full_scale[IMU_GYRO_FS_SEL]))/32768.0f;
 		gyro_accum_degPerSec[i] += gyro_degPerSec[i];
 		gyro_avg_degPerSec[i] = gyro_accum_degPerSec[i] / gyro_avg_samples;
 		// update int versions
