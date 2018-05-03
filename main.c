@@ -82,6 +82,7 @@ uint8_t boot_to_dfu = 0;
 #include "ps_keys.h"
 #include "graphics.h"
 #include "imu.h"
+#include "speaker.h"
 #include <stdio.h>
 
 //***********************************************************************************
@@ -92,6 +93,8 @@ uint8_t boot_to_dfu = 0;
 #define LED_ON_TIME_MS        50
 #define LED_PERIOD_STEP_MS    100
 //#define LED_TIMEOUT_SEC       30
+
+#define MAX_TX_POWER_dBm      8 // +8dBm max from datasheet
 
 #define LED_ON_TIME_NS        (LED_ON_TIME_MS * 1000000UL)
 #define LED_PERIOD_STEP_NS    (LED_PERIOD_STEP_MS * 1000000UL)
@@ -218,6 +221,11 @@ static bool check_ef(uint32_t * ef, uint32_t events) {
 	return ret;
 }
 
+static void update_speaker_from_ps(ps_data_t * ps_d) {
+  speaker_set_freq((uint16_t)(ps_d->s.speaker_pitch) * 100);
+  speaker_set_duty((float)(ps_d->s.speaker_volume) / 100.0f);
+}
+
 //***********************************************************************************
 // main
 //***********************************************************************************
@@ -243,6 +251,7 @@ int main(void) {
 	// Initialize LETIMER
 	letimer_clock_init();
 	//letimer_init();
+	LETIMER_setup();
 	i2c_setup();
 	imu_init();
 	graphics_init();
@@ -251,9 +260,11 @@ int main(void) {
 	while (1) {
 		/* Event pointer for handling events */
 		struct gecko_cmd_packet* evt;
+#if 0
 		int16_t tx_level;
 		static int16_t tx_level_hist = 0;
 		int8_t rssi;
+#endif
 		char passkey_str[30];
 		/* Check for stack event. */
 		evt = gecko_wait_event();
@@ -292,6 +303,9 @@ int main(void) {
 			/* Initialize PS data */
 
 			ps_keys_init(sizeof(gattdb_ps_data), gattdb_ps_data, gattdb_ps_default_data, &ps_data);
+
+			/* set speaker parameters based on read PS data */
+			update_speaker_from_ps(&ps_data);
 			break;
 
 		case gecko_evt_sm_passkey_display_id:
@@ -324,12 +338,14 @@ int main(void) {
 				graphics_println("Connected!");
 				gecko_cmd_le_connection_set_parameters(connection, CON_INT_MIN, CON_INT_MAX, SLAVE_LATENCY, SUP_TIMEOUT);
 			}
-			gecko_cmd_le_connection_get_rssi(connection);
-			gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
+			// want to use max power for this application (will be far from device)
+			gecko_cmd_system_set_tx_power(MAX_TX_POWER_dBm * 10);
+			//gecko_cmd_le_connection_get_rssi(connection);
+			//gecko_cmd_hardware_set_soft_timer(32768/2, 0, 0);
 			break;
 
 		case gecko_evt_le_connection_closed_id:
-			/* Reset output power to 0 dBm */
+			/* Reset output power to 0 dBm for advertisements*/
 			gecko_cmd_system_set_tx_power(0);
 			/* Check if need to boot to dfu mode */
 			if (boot_to_dfu) {
@@ -352,7 +368,7 @@ int main(void) {
 			switch (evt->data.evt_hardware_soft_timer.handle){
 			case 0:
 				    if (connection) {
-				    	gecko_cmd_le_connection_get_rssi(connection);
+				    	//gecko_cmd_le_connection_get_rssi(connection);
 				    }
 					break;
 			case LED_BLINK_RATE_HANDLE:
@@ -366,6 +382,7 @@ int main(void) {
 					break;
 			case LED_TIMEOUT_HANDLE:
 					GPIO_PinOutClear(LED_BW_port, LED_BW_pin);
+					speaker_enable(false);
 					gecko_cmd_hardware_set_soft_timer(0, LED_BLINK_RATE_HANDLE, true);
 					graphics_println("Stop LED");
 					break;
@@ -374,11 +391,11 @@ int main(void) {
 				if (motion_detection_count == 0) {
 					// disc has stopped moving; stop timer
 					gecko_cmd_hardware_set_soft_timer(0, MOTION_TIMEOUT_HANDLE, false);
-					// TODO:  process time in flight (send indication)
 					if (connection) {
 						uint8_t time_in_flight_halfSecond = time_in_flight;
 						gecko_cmd_gatt_server_send_characteristic_notification(connection,
 								gattdb_time_of_flight, sizeof(time_in_flight_halfSecond), (const uint8_t *)(&time_in_flight_halfSecond));
+						gecko_cmd_gatt_server_write_attribute_value(gattdb_time_of_flight, 0, sizeof(time_in_flight_halfSecond), (const uint8_t *)(&time_in_flight_halfSecond));
 					}
 					time_in_flight = 0;
 					motion_timer_started = false;
@@ -435,8 +452,21 @@ int main(void) {
 					graphics_println("flashing...");
 				}
 			}
+			if (evt->data.evt_gatt_server_attribute_value.attribute == gattdb_speaker_on_off) {
+			  struct gecko_msg_gatt_server_read_attribute_value_rsp_t * temp =
+			      gecko_cmd_gatt_server_read_attribute_value(gattdb_speaker_on_off, 0);
+			  if (temp->value.data[0] == 1) {
+			    // Make sure speaker pitch / volume is up-to-date
+			    update_speaker_from_ps(&ps_data);
+			    // Enable Speaker Output
+			    speaker_enable(true);
+			    gecko_cmd_hardware_set_soft_timer((ps_data.s.led_intensity * LFO_HZ), LED_TIMEOUT_HANDLE, true);
+			    graphics_println("Begin speaker!");
+			  }
+			}
 			break;
 
+#if 0
 		case gecko_evt_le_connection_rssi_id:
 			rssi = evt->data.evt_le_connection_rssi.rssi;
 			if (rssi > -35) {
@@ -461,9 +491,9 @@ int main(void) {
 			}
 			tx_level_hist = tx_level;
 			break;
-
+#endif
 		case gecko_evt_system_external_signal_id:
-/*
+#if 0
 			if (event_flag & START_TEMPERATURE_POR) {
 				event_flag &= ~START_TEMPERATURE_POR;
 				i2c_sensor_por();
@@ -508,7 +538,7 @@ int main(void) {
 				i2c_load_stop_cmd();
 				letimer_update_compare1();
 			}
-*/
+#endif
 			if (check_ef(&event_flag, LOAD_IMU_START_WRITE)) {
 				imu_init_sched();
 			}
@@ -522,8 +552,8 @@ int main(void) {
 				imu_config_next();
 			}
 			if (check_ef(&event_flag, IMU_MOTION_INTERRUPT)) {
-				graphics_println("Motion");
-				graphics_println("Detected!");
+				//graphics_println("Motion");
+				//graphics_println("Detected!");
 				if (connection) { // no need to read gyro data if there's no active BLE connection
 					if (!motion_timer_started) {
 						if (imu_enable_gyro(true) == GYRO_EN_SUCCESS) {
@@ -551,23 +581,28 @@ int main(void) {
 			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DATA | ACK_RECEIVED)) {
 				imu_read_gyro_data();
 			}
-			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | ACK_RECEIVED)) {
-				imu_read_gyro_cont();
-			}
 			if (check_ef(&event_flag, LOAD_IMU_READ_GYRO_DRDY | DATA_RECEIVED)) {
 				imu_read_gyro_drdy();
 			}
 			// process the gyro data
 			if (check_ef(&event_flag, GYRO_PROCESS_DATA)) {
 				imu_update_avg();
+				char debugBuffer[100];
 				const uint8_t * gyro_rt = (const uint8_t *)(imu_get_gyro_data_rt_int());
 				const uint8_t * gyro_avg = (const uint8_t *)(imu_get_gyro_data_avg_int());
-				// TODO:  send indication of real-time and average z-axis data
+				sprintf(debugBuffer, "RT: %d", (int)imu_get_gyro_data_rt_int()[2]);
+				graphics_println(debugBuffer);
+				sprintf(debugBuffer, "Avg: %d", (int)imu_get_gyro_data_avg_int()[2]);
+				graphics_println(debugBuffer);
 				if (connection) {
 					gecko_cmd_gatt_server_send_characteristic_notification(connection,
 							gattdb_angular_vel_rt, NUM_OF_GYRO_REGISTERS, gyro_rt);
 					gecko_cmd_gatt_server_send_characteristic_notification(connection,
 							gattdb_angular_vel_avg, NUM_OF_GYRO_REGISTERS, gyro_avg);
+					gecko_cmd_gatt_server_write_attribute_value(gattdb_angular_vel_rt, 0,
+					    NUM_OF_GYRO_REGISTERS, gyro_rt);
+					gecko_cmd_gatt_server_write_attribute_value(gattdb_angular_vel_avg, 0,
+					    NUM_OF_GYRO_REGISTERS, gyro_avg);
 				}
 			}
 

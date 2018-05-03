@@ -14,7 +14,7 @@
  * accel x/y/z axes. LSB = 4mg. Range is 0mg to 1020mg.
  *
  */
-#define IMU_MOTION_THRESHOLD_MG    200
+#define IMU_MOTION_THRESHOLD_MG    40
 /*
 Lposc_clksel Output Frequency (Hz)
 0 0.24
@@ -31,7 +31,7 @@ Lposc_clksel Output Frequency (Hz)
 11 500
 12-15 RESERVED
 */
-#define IMU_MOTION_UPDATE_RATE_HZ 5
+#define IMU_MOTION_UPDATE_RATE_HZ 4
 
 /*
  * Gyro Full Scale Select [4:3]:
@@ -129,7 +129,6 @@ void imu_en_gyro_done(void);
 int8_t imu_read_gyro_start(void);
 void imu_read_gyro_addr(void);
 void imu_read_gyro_data(void);
-void imu_read_gyro_cont(void);
 void imu_read_gyro_drdy(void);
 
 //void imu_calculate_degPerSec(void);

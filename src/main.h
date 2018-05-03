@@ -13,10 +13,10 @@
 //***********************************************************************************
 
 #define ADVERT_TX_DEFAULT_dBm 0
-#define ADVERT_MIN_MS         337
-#define ADVERT_MAX_MS         337
-#define CON_INT_MIN           50 // 60 * 1.25 = 75 ms
-#define CON_INT_MAX           50 // 60 * 1.25 = 75 ms
+#define ADVERT_MIN_MS         750
+#define ADVERT_MAX_MS         750
+#define CON_INT_MIN           60 // 60 * 1.25 = 75 ms
+#define CON_INT_MAX           60 // 60 * 1.25 = 75 ms
 #define SLAVE_LATENCY         5
 #define SUP_TIMEOUT           300
 

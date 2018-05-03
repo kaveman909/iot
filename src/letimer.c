@@ -131,7 +131,7 @@ void letimer_init(void) {
 	// Start the timer
 	LETIMER_Enable(LETIMER0, true);
 }
-
+#if 0
 void LETIMER0_IRQHandler(void) {
 	uint32_t flags = LETIMER_IntGet(LETIMER0);
 	LETIMER_IntClear(LETIMER0, flags);
@@ -150,9 +150,4 @@ void LETIMER0_IRQHandler(void) {
 	}
 	gecko_external_signal(event_flag);
 }
-
-
-
-
-
-
+#endif
