@@ -552,8 +552,8 @@ int main(void) {
 				imu_config_next();
 			}
 			if (check_ef(&event_flag, IMU_MOTION_INTERRUPT)) {
-				graphics_println("Motion");
-				graphics_println("Detected!");
+				//graphics_println("Motion");
+				//graphics_println("Detected!");
 				if (connection) { // no need to read gyro data if there's no active BLE connection
 					if (!motion_timer_started) {
 						if (imu_enable_gyro(true) == GYRO_EN_SUCCESS) {
@@ -587,8 +587,13 @@ int main(void) {
 			// process the gyro data
 			if (check_ef(&event_flag, GYRO_PROCESS_DATA)) {
 				imu_update_avg();
+				char debugBuffer[100];
 				const uint8_t * gyro_rt = (const uint8_t *)(imu_get_gyro_data_rt_int());
 				const uint8_t * gyro_avg = (const uint8_t *)(imu_get_gyro_data_avg_int());
+				sprintf(debugBuffer, "RT: %d", (int)imu_get_gyro_data_rt_int()[2]);
+				graphics_println(debugBuffer);
+				sprintf(debugBuffer, "Avg: %d", (int)imu_get_gyro_data_avg_int()[2]);
+				graphics_println(debugBuffer);
 				if (connection) {
 					gecko_cmd_gatt_server_send_characteristic_notification(connection,
 							gattdb_angular_vel_rt, NUM_OF_GYRO_REGISTERS, gyro_rt);
